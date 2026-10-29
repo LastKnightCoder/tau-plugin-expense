@@ -2,17 +2,14 @@
  * 首页「记账」卡：本月还能花多少（带时间进度条）、今天花了多少，下面是一句话记账。
  */
 import type { ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
 import { cn } from "@tau/ui";
 import { monthOf } from "../data/model";
 import { dailyRoom, isFixed } from "../data/stats";
-import { useRuntime } from "../runtime";
 import { Meter, yuan } from "./bits";
 import { QuickAdd } from "./QuickAdd";
 import { useLedger, useNow } from "./queries";
 
 export function HomePanel() {
-  const { pages } = useRuntime();
   const { today, time } = useNow();
   const query = useLedger(monthOf(today), today);
   if (!query.data) return null;
@@ -34,14 +31,6 @@ export function HomePanel() {
         <Stat label="今天" value={yuan(todaySpent)} foot={stat.budget > 0 && left > 0 ? `每天最多 ${yuan(perDay)}` : null} />
       </div>
       <QuickAdd today={today} time={time} config={config} stat={stat} />
-      <button
-        type="button"
-        onClick={() => void pages.main?.open()}
-        className="ex:text-ink-3 ex:hover:text-ink-1 ex:-my-0.5 ex:inline-flex ex:items-center ex:gap-0.5 ex:self-start ex:py-0.5 ex:text-[12px]"
-      >
-        查看账本
-        <ChevronRight className="ex:size-[13px]" strokeWidth={1.75} />
-      </button>
     </div>
   );
 }

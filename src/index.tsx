@@ -46,6 +46,7 @@ export default definePlugin({
         id: "month",
         title: "记账",
         size: "compact",
+        action: { title: "查看账本", run: () => page.open() },
         component: () => (
           <RuntimeProvider runtime={runtime}>
             <HomePanel />
