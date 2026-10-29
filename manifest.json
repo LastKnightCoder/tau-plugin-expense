@@ -1,0 +1,14 @@
+{
+  "id": "tau.expense",
+  "name": "记账本",
+  "description": "一句话记下每笔花费，按分类预算看本月还能花多少，用日历和图表看清钱花在哪。",
+  "categories": ["page"],
+  "keywords": ["记账", "花费", "支出", "预算", "账本", "消费"],
+  "permissions": ["ai:chat"],
+  "version": "0.1.0",
+  "targets": {
+    "desktop": {
+      "minAppVersion": "0.59.4"
+    }
+  }
+}
