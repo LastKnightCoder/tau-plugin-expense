@@ -1,5 +1,5 @@
 /**
- * 记账本主页（一页，从上往下是「每天看 → 偶尔查 → 月底复盘」）：
+ * 记账本主页（一页，从上往下是「每天看 → 偶尔查 → 月底复盘」）：整页一张纸，标题固定在纸顶、内容在纸内滚动，纸内卡片用细描边。
  * 左列：本月还能花多少 → 月历 → 分类预算 → 近 6 个月与一周规律；右列：一句话记账、流水（撑满剩余高度）、AI。
  * 日历的某天、某个分类、某个月柱三处联动，流水按「月 → 日 → 分类」收窄。宽度不足时右列落到左列下方。
  * 参数 add: true 时聚焦一句话输入（首页卡片与命令跳转用）。
@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PluginPageProps } from "@tau/plugins";
 import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
-import { Button, IconButton, Loading } from "@tau/ui";
+import { Button, FadeScroll, IconButton, Loading } from "@tau/ui";
 import { addDays, addMonths, monthOf } from "../data/model";
 import { samePeriodTotal, weekdayAverages } from "../data/stats";
 import { useRuntime } from "../runtime";
@@ -100,86 +100,95 @@ export function ExpensePage({ params, pageContext }: PluginPageProps) {
   const stamp = `${month}|${stat.total}|${txs.length}`;
 
   return (
-    <div className="ex:@container ex:h-full ex:overflow-y-auto ex:px-1 ex:pt-0.5 ex:pb-6">
-      <div className="ex:grid ex:grid-cols-1 ex:gap-3.5 ex:@[1040px]:grid-cols-[minmax(0,1fr)_344px]">
-        <div className="ex:flex ex:min-w-0 ex:flex-col ex:gap-3.5">
-          <Summary stat={nowStat} todayTxs={derived.todayTxs} yesterday={derived.yesterday} lastSame={derived.lastSame} onSetup={openSettings} />
+    <div className="ex:mx-auto ex:flex ex:h-full ex:min-h-0 ex:w-full ex:max-w-[1720px] ex:flex-col ex:px-4 ex:pb-4 ex:pt-1">
+      <div className="ex:bg-surface ex:shadow-card ex:rounded-tau-lg ex:flex ex:min-h-0 ex:flex-1 ex:flex-col ex:overflow-hidden">
+        <header className="ex:flex-none ex:px-8 ex:pt-5">
+          <h1 className="ex:text-tau-title-lg ex:flex ex:h-10 ex:items-center ex:font-semibold ex:tracking-[-0.01em]">记账</h1>
+        </header>
+        <FadeScroll className="ex:mb-4 ex:min-h-0 ex:flex-1 ex:pb-4 ex:pl-8 ex:pr-[26px] ex:pt-3">
+          <div className="ex:@container">
+            <div className="ex:grid ex:grid-cols-1 ex:gap-3.5 ex:@[1040px]:grid-cols-[minmax(0,1fr)_344px]">
+              <div className="ex:flex ex:min-w-0 ex:flex-col ex:gap-3.5">
+                <Summary stat={nowStat} todayTxs={derived.todayTxs} yesterday={derived.yesterday} lastSame={derived.lastSame} onSetup={openSettings} />
 
-          <Card>
-            <header className="ex:flex ex:flex-wrap ex:items-center ex:gap-1.5 ex:px-[18px] ex:pt-3.5">
-              <IconButton aria-label="上个月" disabled={month <= derived.earliest} onClick={() => goMonth(addMonths(month, -1))}>
-                <ChevronLeft className="ex:size-4" strokeWidth={1.75} />
-              </IconButton>
-              <h2 className="ex:mx-1 ex:text-[14.5px] ex:font-semibold ex:tabular-nums">
-                {month.slice(0, 4)} 年 {monthLabel(month)}
-              </h2>
-              <IconButton aria-label="下个月" disabled={isNow} onClick={() => goMonth(addMonths(month, 1))}>
-                <ChevronRight className="ex:size-4" strokeWidth={1.75} />
-              </IconButton>
-              {!isNow && (
-                <Button size="sm" variant="ghost" onClick={() => goMonth(current)}>
-                  回到本月
-                </Button>
-              )}
-              <span className="ex:text-ink-3 ex:ml-1.5 ex:text-[11.5px]">
-                {filterCat ? `只看${filterCat.name}` : `可控 ${yuan(stat.flex)} · 固定 ${yuan(stat.fixed)}`}
-              </span>
-            </header>
-            <MonthCalendar
-              stat={stat}
-              categories={config.categories}
-              today={today}
-              selectedDay={day}
-              selectedCategory={category}
-              onPickDay={date => setDay(day === date ? null : date)}
-            />
-            <CalendarLegend filterName={filterCat?.name ?? null} allowance={filterCat ? filterCat.budget / stat.days : stat.allowance} />
-          </Card>
+                <Card>
+                  <header className="ex:flex ex:flex-wrap ex:items-center ex:gap-1.5 ex:px-[18px] ex:pt-3.5">
+                    <IconButton aria-label="上个月" disabled={month <= derived.earliest} onClick={() => goMonth(addMonths(month, -1))}>
+                      <ChevronLeft className="ex:size-4" strokeWidth={1.75} />
+                    </IconButton>
+                    <h2 className="ex:mx-1 ex:text-[14.5px] ex:font-semibold ex:tabular-nums">
+                      {month.slice(0, 4)} 年 {monthLabel(month)}
+                    </h2>
+                    <IconButton aria-label="下个月" disabled={isNow} onClick={() => goMonth(addMonths(month, 1))}>
+                      <ChevronRight className="ex:size-4" strokeWidth={1.75} />
+                    </IconButton>
+                    {!isNow && (
+                      <Button size="sm" variant="ghost" onClick={() => goMonth(current)}>
+                        回到本月
+                      </Button>
+                    )}
+                    <span className="ex:text-ink-3 ex:ml-1.5 ex:text-[11.5px]">
+                      {filterCat ? `只看${filterCat.name}` : `可控 ${yuan(stat.flex)} · 固定 ${yuan(stat.fixed)}`}
+                    </span>
+                  </header>
+                  <MonthCalendar
+                    stat={stat}
+                    categories={config.categories}
+                    today={today}
+                    selectedDay={day}
+                    selectedCategory={category}
+                    onPickDay={date => setDay(day === date ? null : date)}
+                  />
+                  <CalendarLegend filterName={filterCat?.name ?? null} allowance={filterCat ? filterCat.budget / stat.days : stat.allowance} />
+                </Card>
 
-          <Card>
-            <CardHead title={`${monthLabel(month)}分类预算`} note={`${isNow ? "竖线 = 时间进度 · " : ""}点一类，日历和流水只看它`}>
-              <Button size="sm" variant="ghost" icon={SlidersHorizontal} onClick={openSettings}>
-                调整预算
-              </Button>
-            </CardHead>
-            <CategoryBudgets stat={stat} categories={config.categories} selected={category} onPick={id => setCategory(category === id ? null : id)} />
-          </Card>
+                <Card>
+                  <CardHead title={`${monthLabel(month)}分类预算`} note={`${isNow ? "竖线 = 时间进度 · " : ""}点一类，日历和流水只看它`}>
+                    <Button size="sm" variant="ghost" icon={SlidersHorizontal} onClick={openSettings}>
+                      调整预算
+                    </Button>
+                  </CardHead>
+                  <CategoryBudgets stat={stat} categories={config.categories} selected={category} onPick={id => setCategory(category === id ? null : id)} />
+                </Card>
 
-          <Review
-            months={derived.chartMonths}
-            categories={config.categories}
-            budget={stat.budget}
-            selected={month}
-            current={current}
-            onPickMonth={goMonth}
-            weekday={derived.weekday}
-          />
-        </div>
+                <Review
+                  months={derived.chartMonths}
+                  categories={config.categories}
+                  budget={stat.budget}
+                  selected={month}
+                  current={current}
+                  onPickMonth={goMonth}
+                  weekday={derived.weekday}
+                />
+              </div>
 
-        <div className="ex:flex ex:min-w-0 ex:flex-col ex:gap-3.5">
-          <Card className="ex:px-4 ex:pt-3.5 ex:pb-3">
-            <div className="ex:text-ink-3 ex:mb-2.5 ex:flex ex:items-center ex:text-[12px]">
-              一句话记账
-              <span className="ex:flex-1" />
-              {dayLabel(today)} {time}
+              <div className="ex:flex ex:min-w-0 ex:flex-col ex:gap-3.5">
+                <Card className="ex:px-4 ex:pt-3.5 ex:pb-3">
+                  <div className="ex:text-ink-3 ex:mb-2.5 ex:flex ex:items-center ex:text-[12px]">
+                    一句话记账
+                    <span className="ex:flex-1" />
+                    {dayLabel(today)} {time}
+                  </div>
+                  <div ref={addRef}>
+                    <QuickAdd today={today} time={time} config={config} stat={nowStat} examples={EXAMPLES} />
+                  </div>
+                </Card>
+                <TxList
+                  className="ex:flex-1"
+                  txs={txs}
+                  categories={config.categories}
+                  month={month}
+                  today={today}
+                  day={day}
+                  category={category}
+                  onClearDay={() => setDay(null)}
+                  onClearCategory={() => setCategory(null)}
+                />
+                <AIPanel stamp={stamp} input={{ today, now: time, config, stat, history: query.data.history, txs }} />
+              </div>
             </div>
-            <div ref={addRef}>
-              <QuickAdd today={today} time={time} config={config} stat={nowStat} examples={EXAMPLES} />
-            </div>
-          </Card>
-          <TxList
-            className="ex:flex-1"
-            txs={txs}
-            categories={config.categories}
-            month={month}
-            today={today}
-            day={day}
-            category={category}
-            onClearDay={() => setDay(null)}
-            onClearCategory={() => setCategory(null)}
-          />
-          <AIPanel stamp={stamp} input={{ today, now: time, config, stat, history: query.data.history, txs }} />
-        </div>
+          </div>
+        </FadeScroll>
       </div>
     </div>
   );

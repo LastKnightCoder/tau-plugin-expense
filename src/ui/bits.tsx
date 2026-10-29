@@ -73,8 +73,9 @@ export function Diff({ value, flat = 3000, className }: { value: number | null; 
   );
 }
 
+/** 纸内卡片：落在页面那张大纸上，用细描边不叠阴影 */
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <section className={cn("ex:bg-surface ex:shadow-card ex:rounded-tau-lg ex:min-w-0", className)}>{children}</section>;
+  return <section className={cn("ex:bg-surface ex:border ex:border-line-1 ex:rounded-tau-lg ex:min-w-0", className)}>{children}</section>;
 }
 
 export function CardHead({ title, note, children }: { title: ReactNode; note?: ReactNode; children?: ReactNode }) {
