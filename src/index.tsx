@@ -72,7 +72,7 @@ export default definePlugin({
         id: "month",
         title: "记账",
         size: "compact",
-        action: mobile ? undefined : { title: "查看账本", run: () => page.open() },
+        action: { title: mobile ? "查看" : "查看账本", run: () => page.open() },
         component: props => wrap(mobile ? <MobileHomePanel {...props} /> : <HomePanel />),
       });
       context.commands.register({

@@ -55,7 +55,7 @@ export function Sheet({
   }, [open, host]);
   if (!mounted) return null;
   return createPortal(
-    <div className="ex:fixed ex:inset-0 ex:z-[60]" data-no-edge-back>
+    <div className="ex:fixed ex:inset-0 ex:z-[60]" data-no-edge-back onClick={event => event.stopPropagation()}>
         <div
           aria-hidden
           onClick={onClose}

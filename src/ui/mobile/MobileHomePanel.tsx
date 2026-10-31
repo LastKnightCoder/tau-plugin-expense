@@ -57,12 +57,20 @@ export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
           <button
             type="button"
             aria-label="按住说话记一笔"
+            onClick={event => event.stopPropagation()}
             {...talk.bind}
             className={cn(button, "ex:flex-1 ex:touch-none ex:select-none", talk.active ? "ex:bg-accent ex:text-ink-inverse" : "ex:bg-hover ex:text-ink-1")}
           >
             <Mic />
           </button>
-          <button type="button" onClick={() => void pages.main?.open({ add: true })} className={cn(button, "ex:bg-accent-soft ex:text-accent-text ex:flex-[2.4]")}>
+          <button
+            type="button"
+            onClick={event => {
+              event.stopPropagation();
+              void pages.main?.open({ add: true });
+            }}
+            className={cn(button, "ex:bg-accent-soft ex:text-accent-text ex:flex-[2.4]")}
+          >
             <Plus />
             记一笔
           </button>

@@ -158,7 +158,7 @@ export function LogBar({
   const showPreview = draft != null && focused;
 
   return (
-    <div className="ex:bg-page ex:shrink-0 ex:px-3 ex:pt-2 ex:pb-[max(8px,env(safe-area-inset-bottom))]">
+    <div className="ex:bg-page ex:shrink-0 ex:px-3 ex:py-2">
       {talk.active ? (
         <TalkPanel talk={talk} />
       ) : showPreview ? (

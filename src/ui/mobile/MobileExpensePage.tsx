@@ -1,7 +1,7 @@
 /**
  * 手机记账主页：入口条（月历 / 回顾与 AI / 设置）→ 主卡 → 分类预算（4 类）→ 按天分组的流水，页底固定记账条。
  * 插件不能往宿主顶栏加按钮，二级页入口放在内容顶部一行。主卡滚出屏幕后顶部吸住一行余额。
- * 参数 add 聚焦记账条（字符串时预填），进入后去掉参数。
+ * 参数 add 聚焦记账条（字符串时预填），每个页面实例只处理一次。
  * 二级页（月历、分类、回顾、搜索）单独注册，见 MobileViews。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -37,16 +37,17 @@ export function MobileExpensePage({ params, pageContext }: PluginPageProps) {
   const [highlight, setHighlight] = useState<string | null>(null);
   const [heroHidden, setHeroHidden] = useState(false);
   const logRef = useRef<LogBarHandle>(null);
+  const handledAddRef = useRef(false);
   const heroRef = useRef<HTMLDivElement>(null);
 
   const ready = query.data != null;
-  // 带参数进入（今天页卡片、命令、月历「补记这天」）时执行一次，随后去掉参数，再次进入同一参数仍会触发
+  // 入口动作只在本实例执行一次；重新打开自身会新增历史，返回时又触发入口动作。
   const addParam = params.add === true ? "" : typeof params.add === "string" ? params.add : null;
   useEffect(() => {
-    if (!ready || addParam == null) return;
-    logRef.current?.fill(addParam);
-    void pages.main?.open({});
-  }, [addParam, ready, pages]);
+    if (!ready || addParam == null || handledAddRef.current || !logRef.current) return;
+    handledAddRef.current = true;
+    logRef.current.fill(addParam);
+  }, [addParam, ready]);
 
   useEffect(() => {
     const el = heroRef.current;
