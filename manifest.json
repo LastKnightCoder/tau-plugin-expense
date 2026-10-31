@@ -5,7 +5,7 @@
   "categories": ["page"],
   "keywords": ["记账", "花费", "支出", "预算", "账本", "消费"],
   "permissions": ["ai:chat", "speech:input"],
-  "version": "0.2.2",
+  "version": "0.2.3",
   "targets": {
     "desktop": {
       "minAppVersion": "0.60.7"
