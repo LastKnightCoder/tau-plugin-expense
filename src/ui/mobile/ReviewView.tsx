@@ -76,17 +76,22 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
   const { ai, context } = useRuntime();
   const [scope, setScope] = useState<AIScope>("tip");
   const [results, setResults] = useState<Partial<Record<AIScope, { text: string; stamp: string; done: boolean }>>>({});
-  const [error, setError] = useState<{ message: string; setup: boolean } | null>(null);
+  const [error, setError] = useState<{ scope: AIScope; message: string; setup: boolean } | null>(null);
+  const [running, setRunning] = useState<AIScope | null>(null);
+  const [contentHeight, setContentHeight] = useState(0);
+  const content = useRef<HTMLDivElement>(null);
   const controller = useRef<AbortController | null>(null);
   const latest = useRef(input);
   latest.current = input;
   useEffect(() => () => controller.current?.abort(), []);
 
   const run = async () => {
+    if (controller.current && !controller.current.signal.aborted) return;
     const target = scope;
-    controller.current?.abort();
+    setContentHeight(content.current?.getBoundingClientRect().height ?? 0);
     const current = new AbortController();
     controller.current = current;
+    setRunning(target);
     setError(null);
     setResults(r => ({ ...r, [target]: { text: "", stamp, done: false } }));
     try {
@@ -96,6 +101,7 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
         text += delta;
         setResults(r => ({ ...r, [target]: { text, stamp, done: false } }));
       }
+      if (current.signal.aborted || context.signal.aborted) return;
       setResults(r => ({ ...r, [target]: { text, stamp, done: true } }));
     } catch (err) {
       if (current.signal.aborted) return;
@@ -105,65 +111,80 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
         return next;
       });
       const message = aiErrorMessage(err);
-      if (message) setError({ message, setup: needsSetup(err) });
+      if (message) setError({ scope: target, message, setup: needsSetup(err) });
+    } finally {
+      if (controller.current === current) {
+        controller.current = null;
+        setRunning(null);
+      }
     }
   };
 
   const result = results[scope];
+  const streaming = running === scope;
+  const visibleError = error?.scope === scope ? error : null;
   const stale = result?.done && result.stamp !== stamp;
   return (
     <MCard>
       <TextTabs<AIScope>
         value={scope}
         onChange={next => {
+          if (next === scope) return;
           setScope(next);
-          setError(null);
+          setContentHeight(0);
         }}
         options={[
           ["tip", "提醒"],
           ["review", "月度复盘"],
         ]}
       />
-      {result ? (
-        <div className="ex:text-[13.5px] ex:leading-[1.75]">
-          <Rendered text={result.text} streaming={!result.done} />
-          {stale && (
-            <div className="ex:text-ink-3 ex:mt-2.5 ex:flex ex:items-center ex:gap-1.5 ex:text-[12px]">
-              记录有变化，结果可能过时
-              <span className="ex:flex-1" />
-              <PrimaryButton small ghost onClick={() => void run()}>
-                <RefreshCw />
-                重新分析
-              </PrimaryButton>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="ex:py-2 ex:text-center">
-          <p className="ex:text-ink-2 ex:text-[13px] ex:leading-[1.7]">
-            {error
-              ? error.message
-              : scope === "tip"
-                ? "看看剩下几天每天最多花多少，哪类要收着点"
-                : "看这个月比平时多花在哪，给出能省多少的建议"}
-          </p>
-          <PrimaryButton
-            small
-            className="ex:mx-auto ex:mt-3"
-            onClick={() => (error?.setup ? void context.ai.openSettings() : void run())}
-          >
-            {error?.setup ? (
-              "去配置模型"
-            ) : (
-              <>
-                <Sparkles />
-                {error ? "重试" : scope === "tip" ? "开始分析" : "开始复盘"}
-              </>
+      <div ref={content} style={{ minHeight: contentHeight }} aria-busy={streaming}>
+        {result && (result.text || result.done) ? (
+          <div className="ex:text-[13.5px] ex:leading-[1.75]">
+            <Rendered text={result.text} streaming={streaming} />
+            {stale && (
+              <div className="ex:text-ink-3 ex:mt-2.5 ex:flex ex:items-center ex:gap-1.5 ex:text-[12px]">
+                记录有变化，结果可能过时
+                <span className="ex:flex-1" />
+                <PrimaryButton small ghost disabled={running !== null} onClick={() => void run()}>
+                  <RefreshCw />
+                  重新分析
+                </PrimaryButton>
+              </div>
             )}
-          </PrimaryButton>
-          <p className="ex:text-ink-3 ex:mt-2.5 ex:text-[11px]">AI 只读取分类金额和备注文字，点了才分析</p>
-        </div>
-      )}
+          </div>
+        ) : (
+          <p className="ex:text-ink-2 ex:pt-2 ex:text-center ex:text-[13px] ex:leading-[1.7]">
+            {streaming
+              ? "正在分析，请稍候…"
+              : visibleError
+                ? visibleError.message
+                : scope === "tip"
+                  ? "看看剩下几天每天最多花多少，哪类要收着点"
+                  : "看这个月比平时多花在哪，给出能省多少的建议"}
+          </p>
+        )}
+        {!result?.done && (
+          <div className="ex:pb-2 ex:text-center">
+            <PrimaryButton
+              small
+              className="ex:mx-auto ex:mt-3"
+              disabled={running !== null}
+              onClick={() => (visibleError?.setup ? void context.ai.openSettings() : void run())}
+            >
+              {visibleError?.setup ? (
+                "去配置模型"
+              ) : (
+                <>
+                  <Sparkles />
+                  {streaming ? "分析中…" : visibleError ? "重试" : scope === "tip" ? "开始分析" : "开始复盘"}
+                </>
+              )}
+            </PrimaryButton>
+            <p className="ex:text-ink-3 ex:mt-2.5 ex:text-[11px]">AI 只读取分类金额和备注文字，点了才分析</p>
+          </div>
+        )}
+      </div>
     </MCard>
   );
 }

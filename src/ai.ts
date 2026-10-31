@@ -126,7 +126,7 @@ export function aiErrorMessage(error: unknown): string | null {
   if (/AI_ABORTED|AbortError/.test(message) || (error instanceof Error && error.name === "AbortError")) return null;
   if (message.startsWith("AI_NOT_CONFIGURED")) return "还没有为「对话功能」分配模型";
   if (message.startsWith("AI_DISABLED")) return "没有授权使用 AI";
-  if (message.startsWith("AI_QUOTA_EXCEEDED")) return "今天的 AI 额度已用完";
+  if (message.startsWith("AI_QUOTA_EXCEEDED")) return "插件的今日 AI 额度不足";
   if (message.startsWith("AI_CONCURRENCY_LIMIT")) return "AI 正忙，稍后再试";
   if (message.startsWith("AI_UNAVAILABLE")) return "当前设备不支持 AI";
   if (message.startsWith("AI_BAD_REPLY")) return message.includes("记录") ? "AI 没整理出来" : "AI 没认出分类";

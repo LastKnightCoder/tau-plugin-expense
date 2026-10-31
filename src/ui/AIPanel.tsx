@@ -20,16 +20,21 @@ export function AIPanel({ input, stamp, className }: { input: AnalysisInput; sta
   const { ai, context } = useRuntime();
   const [scope, setScope] = useState<AIScope>("tip");
   const [results, setResults] = useState<Partial<Record<AIScope, Result>>>({});
-  const [error, setError] = useState<{ message: string; setup: boolean } | null>(null);
+  const [error, setError] = useState<{ scope: AIScope; message: string; setup: boolean } | null>(null);
+  const [running, setRunning] = useState<AIScope | null>(null);
+  const [contentHeight, setContentHeight] = useState(72);
+  const content = useRef<HTMLDivElement>(null);
   const controller = useRef<AbortController | null>(null);
   const latest = useRef(input);
   latest.current = input;
   useEffect(() => () => controller.current?.abort(), []);
 
   const run = async (target: AIScope) => {
-    controller.current?.abort();
+    if (controller.current && !controller.current.signal.aborted) return;
+    setContentHeight(content.current?.getBoundingClientRect().height ?? 72);
     const current = new AbortController();
     controller.current = current;
+    setRunning(target);
     setError(null);
     setResults(r => ({ ...r, [target]: { text: "", stamp, done: false } }));
     try {
@@ -39,6 +44,7 @@ export function AIPanel({ input, stamp, className }: { input: AnalysisInput; sta
         text += delta;
         setResults(r => ({ ...r, [target]: { text, stamp, done: false } }));
       }
+      if (current.signal.aborted || context.signal.aborted) return;
       setResults(r => ({ ...r, [target]: { text, stamp, done: true } }));
     } catch (err) {
       if (current.signal.aborted) return;
@@ -48,12 +54,18 @@ export function AIPanel({ input, stamp, className }: { input: AnalysisInput; sta
         delete next[target];
         return next;
       });
-      if (message) setError({ message, setup: needsSetup(err) });
+      if (message) setError({ scope: target, message, setup: needsSetup(err) });
+    } finally {
+      if (controller.current === current) {
+        controller.current = null;
+        setRunning(null);
+      }
     }
   };
 
   const result = results[scope];
-  const streaming = result != null && !result.done;
+  const streaming = running === scope;
+  const visibleError = error?.scope === scope ? error : null;
   const stale = result?.done && result.stamp !== stamp;
   return (
     <Card className={cn("ex:relative ex:flex ex:flex-col ex:gap-2.5 ex:overflow-hidden ex:px-4 ex:py-3.5", className)}>
@@ -68,46 +80,56 @@ export function AIPanel({ input, stamp, className }: { input: AnalysisInput; sta
         </span>
         <b className="ex:text-[13px] ex:font-semibold">AI</b>
         <span className="ex:flex-1" />
-        <Segmented<AIScope> label="分析范围" size="sm" value={scope} onValueChange={setScope}>
+        <Segmented<AIScope> label="分析范围" size="sm" value={scope} onValueChange={next => {
+          if (next === scope) return;
+          setScope(next);
+          setContentHeight(72);
+        }}>
           <Segmented.Item value="tip" label="提醒" />
           <Segmented.Item value="review" label="月度复盘" />
         </Segmented>
         {result?.done && (
-          <IconButton aria-label="重新分析" onClick={() => void run(scope)} className="ex:size-[26px]">
+          <IconButton aria-label="重新分析" disabled={running !== null} onClick={() => void run(scope)} className="ex:size-[26px]">
             <RefreshCw className="ex:size-[14px]" strokeWidth={1.75} />
           </IconButton>
         )}
       </div>
-      <div className="ex:relative ex:min-h-[72px] ex:text-[12.5px] ex:leading-[1.8]">
-        {result ? (
+      <div
+        ref={content}
+        style={{ minHeight: contentHeight }}
+        aria-busy={streaming}
+        className="ex:relative ex:min-h-[72px] ex:text-[12.5px] ex:leading-[1.8]"
+      >
+        {result && (result.text || result.done) ? (
           <Rendered text={result.text} streaming={streaming} />
-        ) : error ? (
-          <div className="ex:text-ink-2 ex:flex ex:flex-col ex:items-start ex:gap-2">
-            {error.message}
-            {error.setup ? (
-              <Button size="sm" variant="secondary" onClick={() => context.ai.openSettings()}>
-                去分配模型
-              </Button>
-            ) : (
-              <Button size="sm" variant="secondary" onClick={() => void run(scope)}>
-                重试
-              </Button>
-            )}
-          </div>
         ) : (
-          <div className="ex:text-ink-2 ex:flex ex:flex-col ex:items-start ex:gap-2">
-            {scope === "tip"
-              ? "看看剩下几天每天最多花多少，哪个分类需要收着点。"
-              : "复盘这个月比平时多花或少花在哪，给出能省多少的建议。"}
-            <Button size="sm" variant="soft" icon={Sparkles} onClick={() => void run(scope)}>
-              分析
-            </Button>
-          </div>
+          <p className="ex:text-ink-2">
+            {streaming
+              ? "正在分析，请稍候…"
+              : visibleError
+                ? visibleError.message
+                : scope === "tip"
+                  ? "看看剩下几天每天最多花多少，哪个分类需要收着点。"
+                  : "复盘这个月比平时多花或少花在哪，给出能省多少的建议。"}
+          </p>
+        )}
+        {!result?.done && (
+          <Button
+            className="ex:mt-2"
+            size="sm"
+            variant={visibleError ? "secondary" : "soft"}
+            disabled={running !== null}
+            icon={Sparkles}
+            onClick={() => visibleError?.setup ? void context.ai.openSettings() : void run(scope)}
+          >
+            {streaming ? "分析中…" : visibleError?.setup ? "去分配模型" : visibleError ? "重试" : "分析"}
+          </Button>
         )}
         {stale && (
           <button
             type="button"
             onClick={() => void run(scope)}
+            disabled={running !== null}
             className="ex:text-accent-text ex:mt-1.5 ex:text-[11.5px] ex:hover:underline"
           >
             记录有变化，重新分析
