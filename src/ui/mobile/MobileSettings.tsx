@@ -1,11 +1,12 @@
 /**
- * 手机设置：分类与月预算、固定支出两段列表，点一行在底部面板里改；编辑在草稿里进行，点「保存」才写入，
+ * 手机设置：分类与月预算、固定支出两段列表，点一行在底部面板里改；编辑在草稿里进行，保存才写入，
  * 删除分类时它的流水移到「其他」；「按前 3 个月平均填入」与桌面相同。
- * 作为插件页打开时（主页齿轮）有 pageContext：面板接系统返回，有改动没保存时离开先确认；插件中心里的设置没有，面板只靠遮罩关闭。
+ * 在插件详情的设置里由 Tau 提供保存条与离开确认；作为插件页打开时（主页齿轮）有 pageContext：
+ * 面板接系统返回，自带保存按钮，有改动没保存时离开先确认。
  */
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { PluginPageContext } from "@tau/plugins";
+import { useSettingsDraft, type PluginPageContext } from "@tau/plugins";
 import { ChevronRight, History, Plus, Trash2 } from "lucide-react";
 import { Loading, cn, toast } from "@tau/ui";
 import {
@@ -22,6 +23,7 @@ import {
   parseConfig,
 } from "../../data/model";
 import { baseline } from "../../data/stats";
+import { configChanges } from "../../data/changes";
 import { EXPENSE_KEY, useRuntime } from "../../runtime";
 import { ICONS, yuan } from "../bits";
 import { useConfig, useLedger, useNow } from "../queries";
@@ -74,6 +76,28 @@ export function MobileSettings({ pageContext }: { pageContext?: PluginPageContex
     setAsking(false);
   };
 
+  const commit = async () => {
+    if (!draft) return;
+    let moved = 0;
+    for (const id of removed) moved += await data.moveCategory(id, OTHER);
+    await data.saveConfig(draft);
+    if (context.signal.aborted) return;
+    await client.invalidateQueries({ queryKey: EXPENSE_KEY });
+    setDraft(parseConfig(configToJson(draft)));
+    setRemoved([]);
+    return moved ? `已保存，${moved} 笔流水移到了「其他」` : undefined;
+  };
+  const restore = () => {
+    setDraft(structuredClone(config.data!));
+    setRemoved([]);
+  };
+  const hostDraft = useSettingsDraft({
+    dirty: dirty || removed.length > 0,
+    changes: draft && config.data ? configChanges(config.data, draft) : [],
+    save: commit,
+    reset: restore,
+  });
+
   if (!draft) return <Loading minHeight={160} />;
   const base = ledger.data ? baseline(ledger.data.history, monthOf(today)) : [];
   const average = (id: string) => (base.length ? base.reduce((s, m) => s + (m.byCategory[id] ?? 0), 0) / base.length : null);
@@ -83,14 +107,8 @@ export function MobileSettings({ pageContext }: { pageContext?: PluginPageContex
     if (saving) return false;
     setSaving(true);
     try {
-      let moved = 0;
-      for (const id of removed) moved += await data.moveCategory(id, OTHER);
-      await data.saveConfig(draft);
-      if (context.signal.aborted) return false;
-      await client.invalidateQueries({ queryKey: EXPENSE_KEY });
-      setDraft(parseConfig(configToJson(draft)));
-      setRemoved([]);
-      toast.success(moved ? `已保存，${moved} 笔流水移到了「其他」` : "已保存");
+      const text = await commit();
+      toast.success(text ?? "已保存");
       return true;
     } catch {
       toast.error("保存失败");
@@ -187,23 +205,18 @@ export function MobileSettings({ pageContext }: { pageContext?: PluginPageContex
         新增固定支出
       </PrimaryButton>
 
-      <div className="ex:mt-3 ex:flex ex:gap-2">
-        {dirty && (
-          <PrimaryButton
-            ghost
-            className="ex:flex-1"
-            onClick={() => {
-              setDraft(structuredClone(config.data!));
-              setRemoved([]);
-            }}
-          >
-            还原
+      {!hostDraft && (
+        <div className="ex:mt-3 ex:flex ex:gap-2">
+          {dirty && (
+            <PrimaryButton ghost className="ex:flex-1" onClick={restore}>
+              还原
+            </PrimaryButton>
+          )}
+          <PrimaryButton className="ex:flex-[2]" disabled={!dirty || saving} onClick={() => void save()}>
+            {dirty ? "保存" : "已保存"}
           </PrimaryButton>
-        )}
-        <PrimaryButton className="ex:flex-[2]" disabled={!dirty || saving} onClick={() => void save()}>
-          {dirty ? "保存" : "已保存"}
-        </PrimaryButton>
-      </div>
+        </div>
+      )}
 
       {editingCat !== undefined && editing?.kind === "cat" && (
         <CategorySheet
