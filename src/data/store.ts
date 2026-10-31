@@ -86,6 +86,11 @@ export function createExpenseData(store: ExpenseStore) {
       return parseConfig(await store.storage.get(CONFIG_KEY));
     },
 
+    /** 用户是否保存过分类与预算（没保存过时手机主页提示去设置） */
+    async hasSavedConfig(): Promise<boolean> {
+      return (await store.storage.get(CONFIG_KEY)) !== undefined;
+    },
+
     async saveConfig(config: Config): Promise<void> {
       await store.storage.set(CONFIG_KEY, configToJson(config));
     },

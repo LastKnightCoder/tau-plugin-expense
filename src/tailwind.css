@@ -3,3 +3,13 @@
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 @import "@tau/plugins/tailwind.css";
 @source "./";
+
+/* 按住说话时的波形 */
+@keyframes ex-wave {
+  from {
+    transform: scaleY(0.45);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}

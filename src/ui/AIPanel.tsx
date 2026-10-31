@@ -124,7 +124,7 @@ export function AIPanel({ input, stamp, className }: { input: AnalysisInput; sta
 const BULLET = /^\s*[-•]\s/;
 
 /** 只渲染 **粗体**、分段和「- 」开头的建议行，其余原样显示 */
-function Rendered({ text, streaming }: { text: string; streaming: boolean }) {
+export function Rendered({ text, streaming }: { text: string; streaming: boolean }) {
   const paragraphs = text.split(/\n{1,}/).filter(p => p.trim());
   return (
     <div className="ex:flex ex:flex-col ex:gap-2">

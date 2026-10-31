@@ -15,7 +15,16 @@ export interface ExpenseRuntime {
   data: ExpenseData;
   ai: ExpenseAI;
   queryClient: QueryClient;
-  pages: { main?: PluginPageHandle; settings?: PluginSettingsHandle };
+  /** 手机另注册月历、分类、回顾与搜索几个二级页 */
+  pages: {
+    main?: PluginPageHandle;
+    settings?: PluginSettingsHandle;
+    calendar?: PluginPageHandle;
+    categories?: PluginPageHandle;
+    category?: PluginPageHandle;
+    review?: PluginPageHandle;
+    search?: PluginPageHandle;
+  };
   /** 本次启用里最近一次补记固定支出：日期与规则的指纹，以及进行中或已完成的那次 */
   recurring: { mark: string; done: Promise<number> } | null;
 }

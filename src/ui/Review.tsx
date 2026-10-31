@@ -53,7 +53,7 @@ export function Review({
   );
 }
 
-function MonthsChart({
+export function MonthsChart({
   months,
   categories,
   budget,
@@ -185,7 +185,7 @@ function MonthsChart({
   );
 }
 
-function WeekdayBars({ weekday }: { weekday: { mean: (number | null)[]; days: number[] } }) {
+export function WeekdayBars({ weekday }: { weekday: { mean: (number | null)[]; days: number[] } }) {
   const [hover, setHover] = useState<number | null>(null);
   const values = weekday.mean.map(v => v ?? 0);
   const max = Math.max(...values, 1);

@@ -4,6 +4,7 @@
  */
 import type { PluginAICapabilityClient, PluginContext } from "@tau/plugins";
 import { CLASSIFY_SYSTEM, classifyPrompt, parseClassify } from "./data/parse";
+import { ORGANIZE_SYSTEM, organizePrompt, parseOrganized, type OrganizeContext, type Organized } from "./data/voice";
 import { addDays, formatYuan, type Category, type Config, type Tx } from "./data/model";
 import { isFixed, topNotes, type MonthStat, type MonthTotal } from "./data/stats";
 
@@ -33,6 +34,21 @@ export function createAI(context: Pick<PluginContext, "ai">) {
       const id = parseClassify(result.text, categories);
       if (!id) throw new Error("AI_BAD_REPLY：没有得到可用的分类");
       return id;
+    },
+
+    /** 语音记账：拆成几笔、归类并给一句提醒 */
+    async organize(speech: string, categories: readonly Category[], ctx: OrganizeContext, signal?: AbortSignal): Promise<Organized> {
+      const result = await (await model()).chat({
+        messages: [
+          { role: "system", content: ORGANIZE_SYSTEM },
+          { role: "user", content: organizePrompt(speech, categories, ctx) },
+        ],
+        maxOutputTokens: 900,
+        signal,
+      });
+      const organized = parseOrganized(result.text, categories);
+      if (!organized) throw new Error("AI_BAD_REPLY：没有整理出可用的记录");
+      return organized;
     },
 
     async *analyze(scope: AIScope, input: AnalysisInput, signal?: AbortSignal) {
@@ -113,7 +129,7 @@ export function aiErrorMessage(error: unknown): string | null {
   if (message.startsWith("AI_QUOTA_EXCEEDED")) return "今天的 AI 额度已用完";
   if (message.startsWith("AI_CONCURRENCY_LIMIT")) return "AI 正忙，稍后再试";
   if (message.startsWith("AI_UNAVAILABLE")) return "当前设备不支持 AI";
-  if (message.startsWith("AI_BAD_REPLY")) return "AI 没认出分类";
+  if (message.startsWith("AI_BAD_REPLY")) return message.includes("记录") ? "AI 没整理出来" : "AI 没认出分类";
   return "AI 请求失败";
 }
 
