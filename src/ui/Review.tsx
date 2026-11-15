@@ -196,11 +196,13 @@ export function WeekdayBars({ weekday }: { weekday: { mean: (number | null)[]; d
     <>
       <div className="ex:relative ex:grid ex:min-h-[132px] ex:flex-1 ex:grid-cols-7 ex:grid-rows-[minmax(0,1fr)] ex:gap-2 ex:px-[18px] ex:pt-3 ex:pb-2.5" onPointerLeave={() => setHover(null)}>
         {values.map((v, i) => (
-          <div key={i} className="ex:grid ex:h-full ex:min-h-0 ex:grid-rows-[minmax(0,1fr)_auto] ex:justify-items-center ex:gap-1" onPointerEnter={() => setHover(i)}>
-            <span className="ex:flex ex:h-full ex:min-h-0 ex:w-full ex:max-w-[30px] ex:flex-col ex:items-center ex:justify-end ex:gap-[3px]">
-              <b className="ex:text-ink-2 ex:text-[10.5px] ex:font-medium ex:tabular-nums">{weekday.mean[i] == null ? "—" : formatYuan(v)}</b>
+          <div key={i} className="ex:grid ex:h-full ex:min-w-0 ex:min-h-0 ex:grid-rows-[minmax(0,1fr)_auto] ex:justify-items-center ex:gap-1" onPointerEnter={() => setHover(i)}>
+            <span className="ex:flex ex:h-full ex:min-h-0 ex:w-full ex:flex-col ex:items-center ex:justify-end ex:gap-[3px]">
+              <b className="ex:text-ink-2 ex:max-w-full ex:truncate ex:text-[10.5px] ex:font-medium ex:tabular-nums">
+                {weekday.mean[i] == null ? "—" : formatYuan(Math.round(v))}
+              </b>
               <i
-                className="ex:bg-accent ex:block ex:w-full ex:rounded-t-[4px]"
+                className="ex:bg-accent ex:block ex:w-full ex:max-w-[30px] ex:rounded-t-[4px]"
                 style={{ height: `calc((100% - 18px) * ${(v / max).toFixed(3)})`, opacity: i === peak ? 1 : 0.45 }}
               />
             </span>
