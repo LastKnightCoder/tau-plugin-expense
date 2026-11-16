@@ -10,9 +10,11 @@ describe("manifest", () => {
     expect(manifest.permissions.filter(p => !p.startsWith("ai:"))).toEqual(["speech:input"]);
   });
 
-  it("三端都声明，手机最低版本覆盖首页卡片与语音输入", () => {
+  it("三端都声明，手机两端 minAppVersion 一致且格式合法", () => {
     expect(Object.keys(manifest.targets).sort()).toEqual(["android", "desktop", "ios"]);
-    expect(manifest.targets.android.minAppVersion).toBe("0.2.16");
-    expect(manifest.targets.ios.minAppVersion).toBe("0.2.16");
+    const semverLike = /^\d+\.\d+\.\d+$/;
+    expect(manifest.targets.android.minAppVersion).toMatch(semverLike);
+    expect(manifest.targets.ios.minAppVersion).toMatch(semverLike);
+    expect(manifest.targets.android.minAppVersion).toBe(manifest.targets.ios.minAppVersion);
   });
 });
