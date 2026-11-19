@@ -8,7 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { SendHorizontal, Sparkles } from "lucide-react";
 import { Button, IconButton, Spinner, cn, toast } from "@tau/ui";
 import { aiErrorMessage, needsSetup } from "../ai";
-import { addDays, formatYuan, type Config } from "../data/model";
+import { addDays, dateKey, formatYuan, timeKey, type Config } from "../data/model";
 import { parseLine } from "../data/parse";
 import type { MonthStat } from "../data/stats";
 import { EXPENSE_KEY, useRuntime } from "../runtime";
@@ -17,13 +17,11 @@ import { useAliases } from "./queries";
 
 export function QuickAdd({
   today,
-  time,
   config,
   stat,
   examples = [],
 }: {
   today: string;
-  time: string;
   config: Config;
   /** 今天所在月的统计，用来预览余额 */
   stat: MonthStat;
@@ -79,7 +77,8 @@ export function QuickAdd({
     if (!valid || saving) return;
     setSaving(true);
     try {
-      await data.addTx({ date, time: draft.dayOffset ? "12:00" : time, cents: draft.cents!, category: cat.id, note: draft.note, recurringId: null });
+      const now = new Date();
+      await data.addTx({ date: addDays(dateKey(now), draft.dayOffset), time: draft.dayOffset ? "12:00" : timeKey(now), cents: draft.cents!, category: cat.id, note: draft.note, recurringId: null });
       // 手动选过（含 AI 归类）才记住，关键词识别的不占记忆；记不住不影响这笔已经记下
       if (draft.note && picked != null) await data.rememberAlias(draft.note, cat.id).catch(() => undefined);
       if (context.signal.aborted) return;

@@ -13,12 +13,23 @@ import { EXPENSE_KEY, useRuntime } from "../runtime";
 export const HISTORY_MONTHS = 9;
 export const CHART_MONTHS = 6;
 
-/** 当前本地日期与时间，每分钟更新；跨过零点时页面自动换到新的一天 */
+/** 当前本地日期与时间，每分钟更新；页面恢复与窗口回到前台时立即校时 */
 export function useNow() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 60_000);
-    return () => window.clearInterval(timer);
+    const refresh = () => setNow(new Date());
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
   return { today: dateKey(now), time: timeKey(now), date: now };
 }

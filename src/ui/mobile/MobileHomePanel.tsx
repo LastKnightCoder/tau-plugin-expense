@@ -18,10 +18,10 @@ import { VoiceSheet, type VoiceRequest } from "./VoiceSheet";
 
 export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
   const { pages } = useRuntime();
-  const { today, time } = useNow();
+  const { today } = useNow();
   const query = useLedger(monthOf(today), today);
   const [voice, setVoice] = useState<VoiceRequest | null>(null);
-  const talk = useHoldToTalk({ onText: text => setVoice({ text, today, now: time }), onError: message => toast.info(message) });
+  const talk = useHoldToTalk({ onText: text => setVoice({ text }), onError: message => toast.info(message) });
   if (!query.data) return null;
   const { stat, config, txs } = query.data;
   const left = stat.budget - stat.total;

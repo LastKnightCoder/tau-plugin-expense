@@ -27,7 +27,7 @@ export function MobileExpensePage({ params, pageContext }: PluginPageProps) {
   const runtime = useRuntime();
   const { pages, data } = runtime;
   const client = useQueryClient();
-  const { today, time } = useNow();
+  const { today } = useNow();
   const current = monthOf(today);
   const query = useLedger(current, today);
   const saved = useQuery({ queryKey: [...EXPENSE_KEY, "saved"], queryFn: () => data.hasSavedConfig() });
@@ -165,11 +165,10 @@ export function MobileExpensePage({ params, pageContext }: PluginPageProps) {
           <LogBar
             ref={logRef}
             today={today}
-            time={time}
             config={config}
             stat={stat}
             recent={derived.recent}
-            onVoice={text => setVoice({ text, today, now: time })}
+            onVoice={text => setVoice({ text })}
             onSaved={flash}
           />
         </div>

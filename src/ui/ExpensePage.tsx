@@ -170,7 +170,7 @@ export function ExpensePage({ params, pageContext }: PluginPageProps) {
                     {dayLabel(today)} {time}
                   </div>
                   <div ref={addRef}>
-                    <QuickAdd today={today} time={time} config={config} stat={nowStat} examples={EXAMPLES} />
+                    <QuickAdd today={today} config={config} stat={nowStat} examples={EXAMPLES} />
                   </div>
                 </Card>
                 <TxList

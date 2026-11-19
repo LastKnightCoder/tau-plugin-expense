@@ -9,7 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, Calendar, History, Mic, Sparkles, TriangleAlert } from "lucide-react";
 import { cn, toast } from "@tau/ui";
 import { aiErrorMessage, needsSetup } from "../../ai";
-import { OTHER, addDays, monthOf, type Config, type Tx } from "../../data/model";
+import { OTHER, addDays, dateKey, monthOf, timeKey, type Config, type Tx } from "../../data/model";
 import { parseLine } from "../../data/parse";
 import type { MonthStat } from "../../data/stats";
 import { useRuntime } from "../../runtime";
@@ -29,7 +29,6 @@ const EXAMPLES = ["奶茶 18", "打车回家 36", "昨天 份子钱 600"];
 export function LogBar({
   ref,
   today,
-  time,
   config,
   stat,
   recent,
@@ -38,7 +37,6 @@ export function LogBar({
 }: {
   ref?: Ref<LogBarHandle>;
   today: string;
-  time: string;
   config: Config;
   /** 今天所在月的统计 */
   stat: MonthStat;
@@ -107,10 +105,11 @@ export function LogBar({
     const target = category ?? OTHER;
     setSaving(true);
     try {
+      const now = new Date();
       const [tx] = await addTxs(runtime, client, [
         {
-          date,
-          time: draft.dayOffset ? "12:00" : time,
+          date: addDays(dateKey(now), draft.dayOffset),
+          time: draft.dayOffset ? "12:00" : timeKey(now),
           cents: draft.cents,
           category: target,
           note: draft.note,

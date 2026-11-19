@@ -8,7 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Info, Sparkles, X } from "lucide-react";
 import { cn, toast } from "@tau/ui";
 import { aiErrorMessage } from "../../ai";
-import { addDays, formatYuan, parseYuan, type Config } from "../../data/model";
+import { addDays, dateKey, formatYuan, parseYuan, timeKey, type Config } from "../../data/model";
 import type { MonthStat } from "../../data/stats";
 import { splitSpeech, type VoiceItem } from "../../data/voice";
 import { useRuntime } from "../../runtime";
@@ -20,8 +20,6 @@ import { Sheet } from "./Sheet";
 
 export interface VoiceRequest {
   text: string;
-  today: string;
-  now: string;
 }
 
 type Phase = { state: "organizing" } | { state: "ready"; advice: string } | { state: "local"; reason: string };
@@ -80,12 +78,13 @@ export function VoiceSheet({ request, config, stat, onClose }: { request: VoiceR
     if (!request || !items.length || missing || saving) return;
     setSaving(true);
     try {
+      const now = new Date();
       await addTxs(
         runtime,
         client,
         items.map(item => ({
-          date: addDays(request.today, item.dayOffset),
-          time: item.dayOffset ? "12:00" : request.now,
+          date: addDays(dateKey(now), item.dayOffset),
+          time: item.dayOffset ? "12:00" : timeKey(now),
           cents: item.cents!,
           category: item.category,
           note: item.note,

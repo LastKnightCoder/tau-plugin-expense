@@ -10,7 +10,7 @@ import { QuickAdd } from "./QuickAdd";
 import { useLedger, useNow } from "./queries";
 
 export function HomePanel() {
-  const { today, time } = useNow();
+  const { today } = useNow();
   const query = useLedger(monthOf(today), today);
   if (!query.data) return null;
   const { stat, config, txs } = query.data;
@@ -30,7 +30,7 @@ export function HomePanel() {
         />
         <Stat label="今天" value={yuan(todaySpent)} foot={stat.budget > 0 && left > 0 ? `每天最多 ${yuan(perDay)}` : null} />
       </div>
-      <QuickAdd today={today} time={time} config={config} stat={stat} />
+      <QuickAdd today={today} config={config} stat={stat} />
     </div>
   );
 }
