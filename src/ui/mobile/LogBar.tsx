@@ -57,12 +57,6 @@ export function LogBar({
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef<AbortController | null>(null);
-  useImperativeHandle(ref, () => ({
-    fill(value) {
-      change(value);
-      requestAnimationFrame(() => inputRef.current?.focus());
-    },
-  }));
 
   const draft = useMemo(() => parseLine(text, config.categories, aliases.data ?? {}), [text, config.categories, aliases.data]);
   const picked = pick && draft && pick.note === draft.note ? pick.category : null;
@@ -77,6 +71,12 @@ export function LogBar({
     setText(value.slice(0, 80));
     if (!value.trim()) setPick(null);
   };
+
+  const fill = (value: string) => {
+    change(value);
+    inputRef.current?.focus({ preventScroll: true });
+  };
+  useImperativeHandle(ref, () => ({ fill }));
 
   const classify = async () => {
     if (!draft?.note || classifying) return;
@@ -157,7 +157,7 @@ export function LogBar({
   const showPreview = draft != null && focused;
 
   return (
-    <div className="ex:bg-page ex:shrink-0 ex:px-3 ex:py-2">
+    <div data-kb-optout="true" className="ex:bg-page ex:shrink-0 ex:px-3 ex:py-2">
       {talk.active ? (
         <TalkPanel talk={talk} />
       ) : showPreview ? (
@@ -181,10 +181,7 @@ export function LogBar({
             <button
               key={note}
               type="button"
-              onClick={() => {
-                change(chips.length ? `${note} ` : note);
-                requestAnimationFrame(() => inputRef.current?.focus());
-              }}
+              onClick={() => fill(chips.length ? `${note} ` : note)}
               className="ex:bg-surface ex:text-ink-2 ex:flex ex:h-[30px] ex:shrink-0 ex:items-center ex:rounded-full ex:px-3 ex:text-[12.5px] ex:shadow-[inset_0_0_0_1px_var(--tau-line-1)] ex:active:bg-press"
             >
               {note}
