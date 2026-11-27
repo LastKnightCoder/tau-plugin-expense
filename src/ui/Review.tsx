@@ -3,9 +3,11 @@
  * 两列等高；周几柱子在撑满列高的轨道里按比例伸长，数值跟着柱顶走。
  */
 import { useState } from "react";
+import { useI18n } from "@tau/plugins";
 import { cn } from "@tau/ui";
 import { formatYuan, type Category } from "../data/model";
 import type { MonthTotal } from "../data/stats";
+import { messages } from "../i18n";
 import { Card, CardHead, WEEKDAYS, categoryColor, monthLabel, useWidth, yuan } from "./bits";
 
 const H = 196;
@@ -31,10 +33,11 @@ export function Review({
   onPickMonth(month: string): void;
   weekday: { mean: (number | null)[]; days: number[] };
 }) {
+  const { t } = useI18n(messages);
   return (
     <Card className="ex:grid ex:grid-cols-1 ex:@[760px]:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
       <div className="ex:flex ex:min-w-0 ex:flex-col">
-        <CardHead title="近 6 个月" note="点柱子切换月份" />
+        <CardHead title={t("review.title")} note={t("review.switchNote")} />
         <MonthsChart months={months} categories={categories} budget={budget} selected={selected} current={current} onPick={onPickMonth} />
         <div className="ex:text-ink-2 ex:flex ex:flex-wrap ex:gap-x-3 ex:gap-y-1.5 ex:px-[18px] ex:pt-0.5 ex:pb-3.5 ex:text-[11.5px]">
           {categories.map(c => (
@@ -46,7 +49,7 @@ export function Review({
         </div>
       </div>
       <div className="ex:@[760px]:border-line-1 ex:flex ex:min-w-0 ex:flex-col ex:@[760px]:border-l">
-        <CardHead title="一周里哪天花得多" note="近 90 天日均" />
+        <CardHead title={t("review.weekdayTitle")} note={t("review.weekdayNote")} />
         <WeekdayBars weekday={weekday} />
       </div>
     </Card>
@@ -68,6 +71,7 @@ export function MonthsChart({
   current: string;
   onPick(month: string): void;
 }) {
+  const { t, locale } = useI18n(messages);
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(budget, ...months.map(m => m.total), 1);
@@ -85,12 +89,12 @@ export function MonthsChart({
   return (
     <div ref={ref} className="ex:relative ex:mt-1.5 ex:mr-3 ex:ml-1" onPointerLeave={() => setHover(null)}>
       {width > 0 && (
-        <svg width={width} height={H} className="ex:block ex:overflow-visible" role="img" aria-label="近 6 个月每月支出">
+        <svg width={width} height={H} className="ex:block ex:overflow-visible" role="img" aria-label={t("review.chartAria")}>
           {ticks.map(v => (
             <g key={v}>
               <line x1={PAD_L} x2={width - PAD_R} y1={y(v)} y2={y(v)} stroke="var(--tau-line-2)" />
               <text x={PAD_L - 8} y={y(v) + 3.5} textAnchor="end" className="ex:fill-ink-3 ex:text-[10.5px] ex:tabular-nums">
-                {v ? short(v) : 0}
+                {v ? short(v, locale) : 0}
               </text>
             </g>
           ))}
@@ -98,7 +102,7 @@ export function MonthsChart({
             <g>
               <line x1={PAD_L} x2={width - PAD_R} y1={y(budget)} y2={y(budget)} stroke="var(--tau-ink-2)" strokeWidth={1.2} strokeDasharray="4 4" />
               <text x={width - PAD_R} y={y(budget) - 6} textAnchor="end" className="ex:fill-ink-2 ex:text-[10.5px]">
-                预算 {formatYuan(budget)}
+                {t("review.budgetLine", { amount: formatYuan(budget) })}
               </text>
             </g>
           )}
@@ -135,7 +139,7 @@ export function MonthsChart({
                   {m.total ? formatYuan(m.total) : ""}
                 </text>
                 <text x={cx} y={PAD_T + plotH + 16} textAnchor="middle" className={cn("ex:text-[11px]", on ? "ex:fill-ink-1 ex:font-semibold" : "ex:fill-ink-3")}>
-                  {monthLabel(m.month).replace(" ", "")}
+                  {monthLabel(m.month, locale)}
                 </text>
               </g>
             );
@@ -152,7 +156,7 @@ export function MonthsChart({
               onPointerEnter={() => setHover(k)}
               onClick={() => onPick(m.month)}
             >
-              <title>{`${monthLabel(m.month)} ${yuan(m.total)}`}</title>
+              <title>{`${monthLabel(m.month, locale)} ${yuan(m.total)}`}</title>
             </rect>
           ))}
         </svg>
@@ -163,8 +167,8 @@ export function MonthsChart({
           style={{ top: 4, ...(PAD_L + slot * (hover + 1) + 170 > width ? { right: width - PAD_L - slot * hover + 6 } : { left: PAD_L + slot * (hover + 1) - 6 }) }}
         >
           <div className="ex:text-ink-3 ex:mb-0.5 ex:text-[11px]">
-            {h.month.slice(0, 4)} 年 {monthLabel(h.month)}
-            {h.month === current ? "（进行中）" : ""}
+            {t("date.yearMonth", { year: h.month.slice(0, 4), month: monthLabel(h.month, locale) })}
+            {h.month === current ? t("review.inProgress") : ""}
           </div>
           {[...categories]
             .reverse()
@@ -177,7 +181,8 @@ export function MonthsChart({
               </div>
             ))}
           <div className="ex:border-line-1 ex:mt-1 ex:flex ex:border-t ex:pt-1 ex:leading-[1.75]">
-            合计<b className="ex:ml-auto ex:font-semibold ex:tabular-nums">{yuan(h.total)}</b>
+            {t("review.total")}
+            <b className="ex:ml-auto ex:font-semibold ex:tabular-nums">{yuan(h.total)}</b>
           </div>
         </div>
       )}
@@ -186,6 +191,7 @@ export function MonthsChart({
 }
 
 export function WeekdayBars({ weekday }: { weekday: { mean: (number | null)[]; days: number[] } }) {
+  const { t } = useI18n(messages);
   const [hover, setHover] = useState<number | null>(null);
   const values = weekday.mean.map(v => v ?? 0);
   const max = Math.max(...values, 1);
@@ -206,7 +212,7 @@ export function WeekdayBars({ weekday }: { weekday: { mean: (number | null)[]; d
                 style={{ height: `calc((100% - 18px) * ${(v / max).toFixed(3)})`, opacity: i === peak ? 1 : 0.45 }}
               />
             </span>
-            <span className="ex:text-ink-3 ex:text-[10.5px]">{WEEKDAYS[i]}</span>
+            <span className="ex:text-ink-3 ex:text-[10.5px]">{t(WEEKDAYS[i])}</span>
           </div>
         ))}
         {hover != null && (
@@ -215,22 +221,23 @@ export function WeekdayBars({ weekday }: { weekday: { mean: (number | null)[]; d
             style={hover > 3 ? { right: `calc(${((6 - hover) / 7) * 100}% + 28px)` } : { left: `calc(${((hover + 1) / 7) * 100}% + 6px)` }}
           >
             <div className="ex:text-ink-3 ex:mb-0.5 ex:text-[11px]">
-              周{WEEKDAYS[hover]} · {weekday.days[hover]} 天
+              {t("review.dowPrefix", { dow: t(WEEKDAYS[hover]) })} · {t("common.days", { count: weekday.days[hover] })}
             </div>
             <div className="ex:flex ex:gap-3">
-              日均可控支出<b className="ex:ml-auto ex:font-semibold ex:tabular-nums">{yuan(values[hover])}</b>
+              {t("review.dailyFlex")}
+              <b className="ex:ml-auto ex:font-semibold ex:tabular-nums">{yuan(values[hover])}</b>
             </div>
           </div>
         )}
       </div>
       <p className="ex:text-ink-3 ex:px-[18px] ex:pb-3.5 ex:text-[11.5px]">
         {max <= 1
-          ? "记几天之后，这里会显示一周里哪天花得多。"
+          ? t("review.emptyWeek")
           : Math.abs(weekend - workday) < 500
-            ? "周末和工作日花得差不多。"
+            ? t("review.weekSimilar")
             : weekend > workday
-              ? `周末平均每天比工作日多花 ${yuan(weekend - workday)}。`
-              : `工作日平均每天比周末多花 ${yuan(workday - weekend)}。`}
+              ? t("review.weekendMore", { amount: yuan(weekend - workday) })
+              : t("review.weekdayMore", { amount: yuan(workday - weekend) })}
       </p>
     </>
   );
@@ -243,10 +250,7 @@ function niceStep(max: number) {
   return [1, 2, 5, 10].map(k => k * mag).find(s => s >= raw) ?? 10 * mag;
 }
 
-/** 刻度标签：分 → 「3k」「1.5万」 */
-function short(cents: number) {
-  const yuanValue = cents / 100;
-  if (yuanValue >= 10000) return `${+(yuanValue / 10000).toFixed(1)}万`;
-  if (yuanValue >= 1000) return `${+(yuanValue / 1000).toFixed(1)}k`;
-  return String(Math.round(yuanValue));
+/** 刻度标签：金额按界面语言的紧凑数字写法（3,000 / 1.2万 / 12K） */
+function short(cents: number, locale: string) {
+  return new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }).format(cents / 100);
 }

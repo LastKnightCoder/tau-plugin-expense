@@ -4,11 +4,13 @@
  */
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useI18n } from "@tau/plugins";
 import { Search, X } from "lucide-react";
 import { cn } from "@tau/ui";
 import { addMonths, type Category, type Tx } from "../../data/model";
 import { isFixed } from "../../data/stats";
 import { useRuntime } from "../../runtime";
+import { messages } from "../../i18n";
 import { yuan } from "../bits";
 import { CHART_MONTHS } from "../queries";
 import { removeWithUndo } from "./actions";
@@ -32,6 +34,7 @@ export function SearchView({
   spentOf(category: string, month: string): number;
 }) {
   const runtime = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const [query, setQuery] = useState("");
   const [range, setRange] = useState<Range>("half");
@@ -42,13 +45,14 @@ export function SearchView({
   const from = range === "half" ? addMonths(current, -(CHART_MONTHS - 1)) : current;
 
   const result = useMemo(
-    () => txs.filter(t => t.date.slice(0, 7) >= from && (!category || t.category === category) && (!q || t.note.toLowerCase().includes(q))),
+    () => txs.filter(tx => tx.date.slice(0, 7) >= from && (!category || tx.category === category) && (!q || tx.note.toLowerCase().includes(q))),
     [txs, from, category, q]
   );
-  const total = result.reduce((s, t) => s + t.cents, 0);
+  const total = result.reduce((s, tx) => s + tx.cents, 0);
   const months = range === "half" ? CHART_MONTHS : 1;
   // 按备注搜时列出命中的分类，方便再收窄
-  const hitCats = q ? categories.filter(c => result.some(t => t.category === c.id) || c.id === category) : categories;
+  const hitCats = q ? categories.filter(c => result.some(tx => tx.category === c.id) || c.id === category) : categories;
+  const rangeLabel = range === "half" ? t("sv.rangeHalf", { count: CHART_MONTHS }) : t("sv.rangeMonth");
 
   return (
     <div className="ex:flex ex:flex-col ex:gap-3 ex:pt-1 ex:pb-6">
@@ -59,12 +63,12 @@ export function SearchView({
           value={query}
           onChange={e => setQuery(e.target.value.slice(0, 40))}
           enterKeyHint="search"
-          placeholder="搜备注，比如「打车」"
-          aria-label="搜索备注"
+          placeholder={t("sv.searchPh")}
+          aria-label={t("txList.searchOpenAria")}
           className="ex:placeholder:text-ink-3 ex:min-w-0 ex:flex-1 ex:bg-transparent ex:text-[15px] ex:outline-none"
         />
         {query && (
-          <button type="button" aria-label="清空" onClick={() => setQuery("")} className="ex:text-ink-3 ex:grid ex:size-8 ex:place-items-center">
+          <button type="button" aria-label={t("sv.clearAria")} onClick={() => setQuery("")} className="ex:text-ink-3 ex:grid ex:size-8 ex:place-items-center">
             <X className="ex:size-4" />
           </button>
         )}
@@ -72,8 +76,8 @@ export function SearchView({
       <div className="ex:scrollbar-none ex:-mx-4 ex:flex ex:gap-1.5 ex:overflow-x-auto ex:px-4" data-no-tab-swipe>
         {(
           [
-            ["half", `近 ${CHART_MONTHS} 个月`],
-            ["month", "本月"],
+            ["half", t("sv.rangeHalf", { count: CHART_MONTHS })],
+            ["month", t("sv.rangeMonth")],
           ] as [Range, string][]
         ).map(([key, label]) => (
           <Chip key={key} on={range === key} onClick={() => setRange(key)}>
@@ -91,20 +95,21 @@ export function SearchView({
       {(q || category) && (
         <MCard className="ex:py-3">
           <div className="ex:text-ink-3 ex:text-[12px]">
-            {q ? `「${query.trim()}」` : ""}
-            {category ? `${q ? " · " : ""}${categories.find(c => c.id === category)?.name ?? ""}` : ""} {range === "half" ? `近 ${CHART_MONTHS} 个月` : "本月"}
+            {q ? t("sv.queryLabel", { query: query.trim() }) : ""}
+            {category ? `${q ? " · " : ""}${categories.find(c => c.id === category)?.name ?? ""}` : ""} {rangeLabel}
           </div>
           <div className="ex:mt-0.5 ex:flex ex:items-baseline ex:gap-2">
             <b className="ex:text-[24px] ex:font-[750] ex:tabular-nums">{yuan(total)}</b>
             <span className="ex:text-ink-3 ex:text-[12px]">
-              {result.length} 笔{months > 1 && result.length ? ` · 平均每月 ${yuan(total / months)}` : ""}
-              {result.some(isFixed) ? " · 含固定支出" : ""}
+              {t("common.txCount", { count: result.length })}
+              {months > 1 && result.length ? t("sv.monthlyAvg", { amount: yuan(total / months) }) : ""}
+              {result.some(isFixed) ? t("sv.includesFixed") : ""}
             </span>
           </div>
         </MCard>
       )}
       <TxCard
-        title={q || category ? "结果" : "全部流水"}
+        title={q || category ? t("sv.titleResults") : t("sv.titleAll")}
         txs={result}
         categories={categories}
         today={today}
@@ -112,8 +117,8 @@ export function SearchView({
         onMore={() => setDayLimit(n => n + 30)}
         moreStep={30}
         onEdit={setEditing}
-        onDelete={tx => void removeWithUndo(runtime, client, tx)}
-        empty={<p className="ex:text-ink-3 ex:py-6 ex:text-center ex:text-[12.5px]">没有找到，换个说法试试</p>}
+        onDelete={tx => void removeWithUndo(runtime, client, tx, t)}
+        empty={<p className="ex:text-ink-3 ex:py-6 ex:text-center ex:text-[12.5px]">{t("sv.empty")}</p>}
       />
       <TxSheet tx={editing} categories={categories} today={today} spentOf={spentOf} onClose={() => setEditing(null)} />
     </div>

@@ -1,5 +1,5 @@
 /**
- * 页面共用的小部件与格式化：金额、分类图标与颜色、卡片外壳、宽度监听。
+ * 页面共用的小部件与格式化：金额、分类图标与颜色、卡片外壳、宽度监听、日期文案。
  * 金额一律等宽数字；超支 / 比平时多用 danger，省下来用 ok，并始终带正负号。
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -19,8 +19,10 @@ import {
   UtensilsCrossed,
   type LucideIcon,
 } from "lucide-react";
+import { useI18n } from "@tau/plugins";
 import { cn } from "@tau/ui";
 import { formatYuan, type Category } from "../data/model";
+import { messages, type Translate } from "../i18n";
 
 const PALETTE_SIZE = 7;
 export const categoryColor = (color: number) => `var(--ex-c${((color % PALETTE_SIZE) + PALETTE_SIZE) % PALETTE_SIZE})`;
@@ -63,8 +65,9 @@ export const yuan = (cents: number) => `¥${formatYuan(Math.round(cents))}`;
 
 /** 与基准的差：多花为 +（danger），少花为 −（ok），差额小于 flat 视为持平 */
 export function Diff({ value, flat = 3000, className }: { value: number | null; flat?: number; className?: string }) {
+  const { t } = useI18n(messages);
   if (value == null) return <span className={cn("ex:text-ink-3", className)}>—</span>;
-  if (Math.abs(value) < flat) return <span className={cn("ex:text-ink-3", className)}>持平</span>;
+  if (Math.abs(value) < flat) return <span className={cn("ex:text-ink-3", className)}>{t("diff.flat")}</span>;
   return (
     <span className={cn("ex:font-semibold ex:tabular-nums", value > 0 ? "ex:text-danger" : "ex:text-ok", className)}>
       {value > 0 ? "+" : "−"}
@@ -116,11 +119,14 @@ export function useWidth<T extends HTMLElement>() {
   return [ref, width] as const;
 }
 
-const WEEK = "日一二三四五六";
-export function dayLabel(date: string, today?: string): string {
-  if (today && date === today) return "今天";
+const WEEKDAY_KEYS = ["weekday.0", "weekday.1", "weekday.2", "weekday.3", "weekday.4", "weekday.5", "weekday.6"] as const;
+/** 周一开头的表头顺序（一 … 日） */
+export const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0].map(i => WEEKDAY_KEYS[i]);
+export function dayLabel(t: Translate, date: string, today?: string): string {
+  if (today && date === today) return t("date.today");
   const [y, m, d] = date.split("-").map(Number);
-  return `${m}月${d}日 周${WEEK[new Date(y, m - 1, d).getDay()]}`;
+  return t("date.day", { month: m, day: d, week: t(WEEKDAY_KEYS[new Date(y, m - 1, d).getDay()]) });
 }
-export const monthLabel = (month: string) => `${Number(month.slice(5, 7))} 月`;
-export const WEEKDAYS = "一二三四五六日";
+/** 月份短名随界面语言（11月 / Nov）；只取数字月份，年由调用方按模板拼接 */
+export const monthLabel = (month: string, locale: string) =>
+  new Intl.DateTimeFormat(locale, { month: "short" }).format(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1));

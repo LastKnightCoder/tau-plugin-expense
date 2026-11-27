@@ -5,12 +5,14 @@
  */
 import { useRef, useState, type PointerEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useI18n } from "@tau/plugins";
 import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { cn } from "@tau/ui";
 import { addMonths, monthOf, type Category, type Tx } from "../../data/model";
 import type { DayStat, MonthStat } from "../../data/stats";
 import { useRuntime } from "../../runtime";
-import { WEEKDAYS, categoryColor, dayLabel, yuan } from "../bits";
+import { messages } from "../../i18n";
+import { WEEKDAYS, categoryColor, dayLabel, monthLabel, yuan } from "../bits";
 import { CHART_MONTHS } from "../queries";
 import { removeWithUndo } from "./actions";
 import { SwipeRow, TxRow } from "./HomeCards";
@@ -43,6 +45,7 @@ export function CalendarView({
 }) {
   const { pages } = useRuntime();
   const runtime = useRuntime();
+  const { t, locale } = useI18n(messages);
   const client = useQueryClient();
   const [day, setDay] = useState<string | null>(null);
   const [editing, setEditing] = useState<Tx | null>(null);
@@ -87,31 +90,31 @@ export function CalendarView({
             className="ex:bg-ink-1 ex:text-ink-inverse ex:flex ex:h-8 ex:items-center ex:gap-1.5 ex:rounded-full ex:pr-2.5 ex:pl-[5px] ex:text-[12.5px]"
           >
             <CatIcon category={only} size={22} />
-            只看{only.name}
+            {t("common.onlyCat", { name: only.name })}
             <X className="ex:size-3.5 ex:opacity-70" />
           </button>
         </div>
       )}
       <MCard className="ex:px-3 ex:pt-2.5">
         <div className="ex:flex ex:items-center ex:gap-1">
-          <button type="button" aria-label="上个月" disabled={!canPrev} onClick={() => onMonth(addMonths(month, -1))} className="ex:text-ink-2 ex:grid ex:size-8 ex:place-items-center ex:disabled:opacity-30">
+          <button type="button" aria-label={t("common.prevMonth")} disabled={!canPrev} onClick={() => onMonth(addMonths(month, -1))} className="ex:text-ink-2 ex:grid ex:size-8 ex:place-items-center ex:disabled:opacity-30">
             <ChevronLeft className="ex:size-[18px]" />
           </button>
           <h2 className="ex:text-[15px] ex:font-[650] ex:tabular-nums">
-            {month.slice(0, 4)} 年 {Number(month.slice(5))} 月
+            {t("date.yearMonth", { year: month.slice(0, 4), month: monthLabel(month, locale) })}
           </h2>
-          <button type="button" aria-label="下个月" disabled={!canNext} onClick={() => onMonth(addMonths(month, 1))} className="ex:text-ink-2 ex:grid ex:size-8 ex:place-items-center ex:disabled:opacity-30">
+          <button type="button" aria-label={t("common.nextMonth")} disabled={!canNext} onClick={() => onMonth(addMonths(month, 1))} className="ex:text-ink-2 ex:grid ex:size-8 ex:place-items-center ex:disabled:opacity-30">
             <ChevronRight className="ex:size-[18px]" />
           </button>
           <span className="ex:flex-1" />
           <span className="ex:text-ink-3 ex:text-[11.5px] ex:tabular-nums">
-            {only && onlyStat ? `${only.name} ${yuan(onlyStat.spent)}${only.budget ? ` / ${yuan(only.budget).slice(1)}` : ""}` : `可控 ${yuan(stat.flex)} · 固定 ${yuan(stat.fixed)}`}
+            {only && onlyStat ? `${only.name} ${yuan(onlyStat.spent)}${only.budget ? ` / ${yuan(only.budget).slice(1)}` : ""}` : t("common.flexFixed", { flex: yuan(stat.flex), fixed: yuan(stat.fixed) })}
           </span>
         </div>
         <div className="ex:mt-2 ex:grid ex:touch-pan-y ex:grid-cols-7 ex:gap-[3px]" onPointerDown={onDown} onPointerUp={onUp} data-no-tab-swipe>
-          {[...WEEKDAYS].map(w => (
+          {WEEKDAYS.map(w => (
             <span key={w} className="ex:text-ink-3 ex:pb-0.5 ex:text-center ex:text-[10.5px]">
-              {w}
+              {t(w)}
             </span>
           ))}
           {Array.from({ length: first }, (_, i) => (
@@ -145,25 +148,25 @@ export function CalendarView({
             {stat.fixed > 0 && (
               <span className="ex:inline-flex ex:items-center ex:gap-1.5">
                 <i className="ex:bg-ink-3 ex:size-[5px] ex:rounded-full" />
-                有固定支出
+                {t("calendar.legendFixed")}
               </span>
             )}
           </div>
         )}
         {allowance > 0 && (
           <p className="ex:text-ink-3 ex:mt-1.5 ex:mb-0.5 ex:text-[11px]">
-            {only ? `${only.name}日均额度` : "日均额度"} {yuan(allowance)} · 红字 = 超过日均额度
+            {t(only ? "calendar.allowanceCat" : "calendar.allowance", only ? { name: only.name } : undefined)} {yuan(allowance)} · {t("calendar.allowanceHint")}
           </p>
         )}
       </MCard>
       {!only && past.length > 0 && (
         <MCard className="ex:flex ex:gap-2.5 ex:py-3">
           <div className="ex:min-w-0 ex:flex-1">
-            <div className="ex:text-ink-3 ex:text-[11.5px]">花得最多的一天</div>
+            <div className="ex:text-ink-3 ex:text-[11.5px]">{t("calendar.peakDay")}</div>
             <div className="ex:mt-0.5 ex:truncate ex:text-[14px] ex:font-[650]">
               {peak && amountOf(peak) > 0 ? (
                 <>
-                  {dayLabel(peak.date)} <span className="ex:tabular-nums">{yuan(amountOf(peak))}</span>
+                  {dayLabel(t, peak.date)} <span className="ex:tabular-nums">{yuan(amountOf(peak))}</span>
                 </>
               ) : (
                 "—"
@@ -171,9 +174,9 @@ export function CalendarView({
             </div>
           </div>
           <div className="ex:min-w-0 ex:flex-1">
-            <div className="ex:text-ink-3 ex:text-[11.5px]">没花钱的日子</div>
+            <div className="ex:text-ink-3 ex:text-[11.5px]">{t("calendar.zeroDays")}</div>
             <div className="ex:mt-0.5 ex:text-[14px] ex:font-[650]">
-              <span className="ex:tabular-nums">{zero}</span> 天
+              <span className="ex:tabular-nums">{t("common.days", { count: zero })}</span>
             </div>
           </div>
         </MCard>
@@ -182,8 +185,8 @@ export function CalendarView({
       <Sheet
         open={day != null && editing == null}
         onClose={() => setDay(null)}
-        title={day ? dayLabel(day) : ""}
-        subtitle={dayStat && dayTxs.length ? `${dayTxs.length} 笔${allowance > 0 && amountOf(dayStat) > allowance ? ` · 超日均 ${yuan(amountOf(dayStat) - allowance)}` : allowance > 0 ? " · 在日均额度内" : ""}` : undefined}
+        title={day ? dayLabel(t, day) : ""}
+        subtitle={dayStat && dayTxs.length ? `${t("common.txCount", { count: dayTxs.length })}${allowance > 0 && amountOf(dayStat) > allowance ? ` · ${t("calendar.overAllowance", { amount: yuan(amountOf(dayStat) - allowance) })}` : allowance > 0 ? ` · ${t("calendar.withinAllowance")}` : ""}` : undefined}
         trailing={dayStat ? <b className="ex:text-[16px] ex:tabular-nums">{yuan(amountOf(dayStat))}</b> : null}
       >
         <div className="ex:divide-line-2 ex:mt-1 ex:divide-y">
@@ -193,12 +196,12 @@ export function CalendarView({
               open={opened === tx.id}
               onOpen={next => setOpened(next ? tx.id : null)}
               onEdit={() => setEditing(tx)}
-              onDelete={tx.recurringId ? null : () => void removeWithUndo(runtime, client, tx)}
+              onDelete={tx.recurringId ? null : () => void removeWithUndo(runtime, client, tx, t)}
             >
               <TxRow tx={tx} category={categories.find(c => c.id === tx.category)} onClick={() => (opened ? setOpened(null) : setEditing(tx))} />
             </SwipeRow>
           ))}
-          {!dayTxs.length && <p className="ex:text-ink-3 ex:py-5 ex:text-center ex:text-[12.5px]">这天没有花钱</p>}
+          {!dayTxs.length && <p className="ex:text-ink-3 ex:py-5 ex:text-center ex:text-[12.5px]">{t("calendar.emptyDay")}</p>}
         </div>
         {day && monthOf(day) === current && (
           <PrimaryButton
@@ -211,7 +214,7 @@ export function CalendarView({
             }}
           >
             <Plus />
-            {day === today ? "记一笔" : "补记这天"}
+            {day === today ? t("calendar.logToday") : t("calendar.logPast")}
           </PrimaryButton>
         )}
       </Sheet>
@@ -220,7 +223,7 @@ export function CalendarView({
   );
 }
 
-/** 一句话记账只认「昨天 / 前天」；更早的日子先记到今天，再在编辑面板改日期 */
+/** 一句话记账只认「昨天 / 前天」；更早的日子先记到今天，再在编辑面板改日期。前缀词是解析语法，保持简体中文 */
 function dayOffsetWord(day: string, today: string): string {
   const diff = Math.round((new Date(`${today}T00:00`).getTime() - new Date(`${day}T00:00`).getTime()) / 86_400_000);
   return diff === 1 ? "昨天 " : diff === 2 ? "前天 " : "";
@@ -255,11 +258,12 @@ function Cell({
       </span>
     );
   const segments = categories.filter(c => (day.byCategory[c.id] ?? 0) > 0);
+  const { t, locale } = useI18n(messages);
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={`${dayLabel(day.date)} ${yuan(amount)}`}
+      aria-label={t("calendar.cellAria", { day: dayLabel(t, day.date), amount: yuan(amount) })}
       className={cn(
         "ex:relative ex:flex ex:h-[50px] ex:flex-col ex:overflow-hidden ex:rounded-[9px] ex:px-1 ex:pt-1 ex:text-left",
         selected ? "ex:bg-ink-1 ex:text-ink-inverse" : "ex:bg-hover",
@@ -272,7 +276,7 @@ function Cell({
       </span>
       {amount > 0 && (
         <span className={cn("ex:mt-auto ex:mb-[7px] ex:text-right ex:text-[11px] ex:font-[650] ex:tabular-nums", over && !selected && "ex:text-danger")}>
-          {formatShort(amount)}
+          {formatShort(amount, locale)}
         </span>
       )}
       {amount > 0 && (
@@ -286,8 +290,7 @@ function Cell({
   );
 }
 
-/** 格子很窄：整数元，过万写成「1.2万」 */
-function formatShort(cents: number) {
-  const value = Math.round(cents / 100);
-  return value >= 10000 ? `${(value / 10000).toFixed(1)}万` : String(value);
+/** 格子很窄：整数元，按界面语言的紧凑数字写法（3,000 / 1.2万 / 12K） */
+function formatShort(cents: number, locale: string) {
+  return new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }).format(Math.round(cents / 100));
 }

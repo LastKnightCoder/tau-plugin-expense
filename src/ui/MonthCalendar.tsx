@@ -4,9 +4,11 @@
  * 选了分类时只画这一类，基准换成该分类的日均额度。固定支出不进日历，当天有固定支出时左上角打点。
  */
 import { useState } from "react";
+import { useI18n } from "@tau/plugins";
 import { cn } from "@tau/ui";
 import type { Category } from "../data/model";
 import type { DayStat, MonthStat } from "../data/stats";
+import { messages } from "../i18n";
 import { WEEKDAYS, categoryColor, dayLabel, useWidth, yuan } from "./bits";
 
 export function MonthCalendar({
@@ -24,6 +26,7 @@ export function MonthCalendar({
   selectedCategory: string | null;
   onPickDay(date: string): void;
 }) {
+  const { t } = useI18n(messages);
   const [hover, setHover] = useState<{ day: DayStat; x: number; y: number } | null>(null);
   const [ref, width] = useWidth<HTMLDivElement>();
   const filterCat = selectedCategory ? categories.find(c => c.id === selectedCategory) ?? null : null;
@@ -40,12 +43,12 @@ export function MonthCalendar({
   return (
     <div ref={ref} className="ex:relative ex:px-[18px] ex:pt-2.5 ex:pb-1" onPointerLeave={() => setHover(null)}>
       <div className="ex:grid ex:grid-cols-[repeat(7,minmax(0,1fr))_64px] ex:gap-[5px]">
-        {[...WEEKDAYS].map(w => (
+        {WEEKDAYS.map(w => (
           <span key={w} className="ex:text-ink-3 ex:pb-0.5 ex:pl-2 ex:text-[11px]">
-            {w}
+            {t(w)}
           </span>
         ))}
-        <span className="ex:text-ink-3 ex:pr-1 ex:pb-0.5 ex:text-right ex:text-[11px]">周合计</span>
+        <span className="ex:text-ink-3 ex:pr-1 ex:pb-0.5 ex:text-right ex:text-[11px]">{t("calendar.weekTotal")}</span>
         {weeks.map((week, w) => {
           const total = week.reduce((s, d) => s + (d && !d.future ? amountOf(d, selectedCategory) : 0), 0);
           return [
@@ -107,6 +110,7 @@ function Cell({
   onClick(): void;
   onHover(x: number, y: number): void;
 }) {
+  const { t } = useI18n(messages);
   const amount = amountOf(day, selectedCategory);
   const segments = categories.filter(c => (selectedCategory ? c.id === selectedCategory : true) && (day.byCategory[c.id] ?? 0) > 0);
   const full = Math.min(1, amount / scale);
@@ -121,7 +125,7 @@ function Cell({
         if (r) onHover(e.clientX - r.left, e.clientY - r.top);
       }}
       aria-pressed={selected}
-      aria-label={`${dayLabel(day.date)} 支出 ${yuan(amount)}`}
+      aria-label={t("calendar.cellAria", { day: dayLabel(t, day.date), amount: yuan(amount) })}
       className={cn(
         "ex:relative ex:flex ex:h-16 ex:min-w-0 ex:flex-col ex:rounded-[10px] ex:px-2 ex:pt-1.5 ex:pb-[7px] ex:text-left ex:transition-[background] ex:duration-150 ex:ease-tau-out",
         selected ? "ex:bg-surface ex:shadow-[0_0_0_2px_var(--tau-accent-text)]" : "ex:bg-hover ex:hover:bg-press",
@@ -141,7 +145,9 @@ function Cell({
           {amount ? yuan(amount).slice(1) : "0"}
         </span>
       </span>
-      <span className="ex:text-ink-3 ex:mt-0.5 ex:truncate ex:text-[10.5px]">{top ? top.note || "—" : today ? "记录中" : amount ? "" : "没花钱"}</span>
+      <span className="ex:text-ink-3 ex:mt-0.5 ex:truncate ex:text-[10.5px]">
+        {top ? top.note || "—" : today ? t("calendar.todayLogging") : amount ? "" : t("calendar.noSpend")}
+      </span>
       <span className="ex:mt-auto ex:flex ex:h-1.5 ex:items-center ex:gap-0.5">
         {segments.map((c, i) => (
           <i
@@ -161,13 +167,14 @@ function Cell({
 }
 
 function Tip({ day, x, y, flip, categories }: { day: DayStat; x: number; y: number; flip: boolean; categories: readonly Category[] }) {
+  const { t } = useI18n(messages);
   const rows = categories.filter(c => (day.byCategory[c.id] ?? 0) > 0);
   return (
     <div
       className="ex:bg-surface ex:shadow-float ex:pointer-events-none ex:absolute ex:z-10 ex:min-w-[150px] ex:rounded-[10px] ex:px-[11px] ex:py-2 ex:text-[12px] ex:whitespace-nowrap"
       style={{ left: x + 14, top: Math.max(0, y - 20), transform: flip ? "translateX(calc(-100% - 28px))" : undefined }}
     >
-      <div className="ex:text-ink-3 ex:mb-0.5 ex:text-[11px]">{dayLabel(day.date)}</div>
+      <div className="ex:text-ink-3 ex:mb-0.5 ex:text-[11px]">{dayLabel(t, day.date)}</div>
       {rows.length ? (
         rows.map(c => (
           <div key={c.id} className="ex:flex ex:items-center ex:gap-2 ex:leading-[1.75]">
@@ -177,9 +184,9 @@ function Tip({ day, x, y, flip, categories }: { day: DayStat; x: number; y: numb
           </div>
         ))
       ) : (
-        <div className="ex:text-ink-3">没有可控支出</div>
+        <div className="ex:text-ink-3">{t("calendar.noFlex")}</div>
       )}
-      {day.fixed > 0 && <div className="ex:text-ink-3 ex:mt-1 ex:text-[11px]">另有固定支出 {yuan(day.fixed)}，不计入日历</div>}
+      {day.fixed > 0 && <div className="ex:text-ink-3 ex:mt-1 ex:text-[11px]">{t("calendar.fixedNote", { amount: yuan(day.fixed) })}</div>}
     </div>
   );
 }

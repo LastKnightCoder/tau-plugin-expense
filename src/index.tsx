@@ -1,6 +1,7 @@
 import { Wallet } from "lucide-react";
 import { SIDEBAR_GROUPS, definePlugin, type PluginPageProps, type PluginSettingsProps } from "@tau/plugins";
 import { registerCollections } from "./data/store";
+import { messages, type MessageKey } from "./i18n";
 import { createRuntime, RuntimeProvider } from "./runtime";
 import { ExpensePage } from "./ui/ExpensePage";
 import { HomePanel } from "./ui/HomePanel";
@@ -13,17 +14,18 @@ import "./styles.css";
 
 declare const __PLUGIN_META__: { id: string; name: string; version: string };
 
-/** 手机二级页：页面 ID、标题、对应的 view；分类详情按分类区分实例 */
-const MOBILE_VIEWS: { id: MobileView; title: string; params?: boolean }[] = [
-  { id: "calendar", title: "月历" },
-  { id: "categories", title: "分类预算" },
-  { id: "category", title: "分类", params: true },
-  { id: "review", title: "回顾与 AI" },
-  { id: "search", title: "搜索流水" },
+/** 手机二级页：页面 ID、标题 key、对应的 view；分类详情按分类区分实例 */
+const MOBILE_VIEWS: { id: MobileView; titleKey: MessageKey; params?: boolean }[] = [
+  { id: "calendar", titleKey: "app.page.calendar" },
+  { id: "categories", titleKey: "app.page.categories" },
+  { id: "category", titleKey: "app.page.category", params: true },
+  { id: "review", titleKey: "app.page.review" },
+  { id: "search", titleKey: "app.page.search" },
 ];
 
 export default definePlugin({
   ...__PLUGIN_META__,
+  i18n: messages,
   create: () => ({
     activate(context) {
       registerCollections(context);
@@ -33,7 +35,7 @@ export default definePlugin({
       const wrap = (node: React.ReactNode) => <RuntimeProvider runtime={runtime}>{node}</RuntimeProvider>;
       const page = context.pages.register({
         id: "expense",
-        title: "记账",
+        title: messages.ref("app.page.title"),
         component: (props: PluginPageProps) => wrap(mobile ? <MobileExpensePage {...props} /> : <ExpensePage {...props} />),
       });
       runtime.pages.main = page;
@@ -41,43 +43,43 @@ export default definePlugin({
         for (const view of MOBILE_VIEWS)
           runtime.pages[view.id] = context.pages.register({
             id: view.id,
-            title: view.title,
+            title: messages.ref(view.titleKey),
             ...(view.params ? { match: "params" as const, getId: params => String(params.id ?? "") } : {}),
             component: (props: PluginPageProps) => wrap(<MobileViews {...props} view={view.id} />),
           });
-        context.navigation.registerEntry({ id: "expense", title: "记账本", icon: Wallet, page });
+        context.navigation.registerEntry({ id: "expense", title: messages.ref("app.nav.title"), icon: Wallet, page });
       } else
         context.sidebar.registerItem({
           id: "expense",
-          title: "记账",
+          title: messages.ref("app.page.title"),
           icon: Wallet,
           group: SIDEBAR_GROUPS.daily,
           page,
         });
       const settings = context.settings.register({
         id: "budget",
-        title: "分类、预算与固定支出",
-        description: "每个分类的月预算，以及每月自动记入的固定支出",
+        title: messages.ref("app.settings.title"),
+        description: messages.ref("app.settings.description"),
         component: (props: PluginSettingsProps) => wrap(mobile ? <MobileSettings /> : <SettingsForm {...props} />),
       });
       // 手机从主页齿轮进的是插件页：面板接系统返回，有改动没保存时离开先确认
       runtime.pages.settings = mobile
         ? context.pages.register({
             id: "settings",
-            title: "预算与固定支出",
+            title: messages.ref("app.page.settings"),
             component: (props: PluginPageProps) => wrap(<MobileSettings pageContext={props.pageContext} />),
           })
         : settings;
       context.home.registerPanel({
         id: "month",
-        title: "记账",
+        title: messages.ref("app.page.title"),
         size: "compact",
-        action: { title: mobile ? "查看" : "查看账本", run: () => page.open() },
+        action: { title: messages.ref(mobile ? "app.home.action.viewMobile" : "app.home.action.view"), run: () => page.open() },
         component: props => wrap(mobile ? <MobileHomePanel {...props} /> : <HomePanel />),
       });
       context.commands.register({
         id: "add",
-        title: "记账：记一笔",
+        title: messages.ref("app.command.add"),
         run: async () => {
           await page.open({ add: true });
           return null;

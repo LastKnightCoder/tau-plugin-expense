@@ -6,12 +6,13 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { PluginPageProps } from "@tau/plugins";
+import { useI18n, type PluginPageProps } from "@tau/plugins";
 import { CalendarDays, ChartColumn, Settings, SlidersHorizontal } from "lucide-react";
 import { Loading, cn } from "@tau/ui";
 import { addDays, monthOf, type Tx } from "../../data/model";
 import { byCategory, isFixed, samePeriodTotal } from "../../data/stats";
 import { EXPENSE_KEY, useRuntime } from "../../runtime";
+import { messages } from "../../i18n";
 import { yuan } from "../bits";
 import { useLedger, useNow } from "../queries";
 import { removeWithUndo } from "./actions";
@@ -25,6 +26,7 @@ const HIGHLIGHT_MS = 2400;
 
 export function MobileExpensePage({ params, pageContext }: PluginPageProps) {
   const runtime = useRuntime();
+  const { t, locale } = useI18n(messages);
   const { pages, data } = runtime;
   const client = useQueryClient();
   const { today } = useNow();
@@ -81,7 +83,7 @@ export function MobileExpensePage({ params, pageContext }: PluginPageProps) {
     };
   }, [query.data, today, current]);
 
-  if (query.isError) return <div className="ex:text-ink-3 ex:grid ex:h-60 ex:place-items-center ex:text-[13px]">记录读取失败</div>;
+  if (query.isError) return <div className="ex:text-ink-3 ex:grid ex:h-60 ex:place-items-center ex:text-[13px]">{t("common.loadFailed")}</div>;
   if (!query.data || !derived) return <Loading minHeight={240} />;
   const { stat, config, txs } = query.data;
   const fresh = saved.data === false && derived.monthTxs.length < 5 && txs.length < 5;
@@ -98,10 +100,10 @@ export function MobileExpensePage({ params, pageContext }: PluginPageProps) {
       <div className="ex:-mx-4 ex:flex ex:min-h-full ex:flex-col">
         <div className="ex:flex ex:flex-1 ex:flex-col ex:gap-3 ex:px-4 ex:pt-1 ex:pb-4">
           <div className="ex:flex ex:gap-1.5">
-            <EntryButton icon={<CalendarDays />} label="月历" onClick={() => void pages.calendar?.open({})} />
-            <EntryButton icon={<ChartColumn />} label="回顾与 AI" onClick={() => void pages.review?.open()} />
+            <EntryButton icon={<CalendarDays />} label={t("app.page.calendar")} onClick={() => void pages.calendar?.open({})} />
+            <EntryButton icon={<ChartColumn />} label={t("app.page.review")} onClick={() => void pages.review?.open()} />
             <span className="ex:flex-1" />
-            <EntryButton icon={<Settings />} label="设置" onClick={() => void pages.settings?.open()} iconOnly />
+            <EntryButton icon={<Settings />} label={t("common.settings")} onClick={() => void pages.settings?.open()} iconOnly />
           </div>
           <div
             className={cn(
@@ -123,10 +125,8 @@ export function MobileExpensePage({ params, pageContext }: PluginPageProps) {
               className="ex:bg-accent-soft ex:text-accent-text ex:flex ex:items-center ex:gap-2.5 ex:rounded-[14px] ex:px-3 ex:py-2.5 ex:text-left ex:text-[12.5px] ex:leading-[1.5]"
             >
               <SlidersHorizontal className="ex:size-[17px] ex:shrink-0" />
-              <span className="ex:flex-1">
-                先按自己的情况改一改各分类的月预算，再把房租、会员这类<b className="ex:font-[650]">固定支出</b>填进去
-              </span>
-              <b className="ex:shrink-0 ex:font-[650]">去设置</b>
+              <span className="ex:flex-1">{t("mobile.freshTip")}</span>
+              <b className="ex:shrink-0 ex:font-[650]">{t("common.goSettings")}</b>
             </button>
           ) : (
             <CategoryCard
@@ -138,27 +138,27 @@ export function MobileExpensePage({ params, pageContext }: PluginPageProps) {
             />
           )}
           <TxCard
-            note={`${Number(current.slice(5))} 月 ${derived.monthTxs.length} 笔`}
+            note={t("mobile.monthTxNote", { month: Number(current.slice(5)), count: derived.monthTxs.length })}
             txs={derived.recent}
             categories={config.categories}
             today={today}
             dayLimit={dayLimit}
             onMore={() => setDayLimit(n => n + MORE_DAYS)}
             onEdit={setEditing}
-            onDelete={tx => void removeWithUndo(runtime, client, tx)}
+            onDelete={tx => void removeWithUndo(runtime, client, tx, t)}
             onSearch={() => void pages.search?.open()}
             highlight={highlight}
             empty={
               <p className="ex:text-ink-3 ex:py-6 ex:text-center ex:text-[12.5px] ex:leading-[1.7]">
-                <b className="ex:text-ink-1 ex:mb-1 ex:block ex:text-[14px] ex:font-semibold">还没有流水</b>
-                在下面写一句「奶茶 18」，
+                <b className="ex:text-ink-1 ex:mb-1 ex:block ex:text-[14px] ex:font-semibold">{t("mobile.emptyTitle")}</b>
+                {t("mobile.emptyHint1")}
                 <br />
-                或者按住麦克风说「午饭二十八」
+                {t("mobile.emptyHint2")}
               </p>
             }
           />
-          {derived.recent.length > 0 && dayLimit >= new Set(derived.recent.map(t => t.date)).size && (
-            <p className="ex:text-ink-3 ex:text-center ex:text-[11.5px]">更早的流水在月历和搜索里看 · 本月可控 {yuan(stat.flex)}</p>
+          {derived.recent.length > 0 && dayLimit >= new Set(derived.recent.map(tx => tx.date)).size && (
+            <p className="ex:text-ink-3 ex:text-center ex:text-[11.5px]">{t("mobile.footnote", { amount: yuan(stat.flex) })}</p>
           )}
         </div>
         <div className="ex:sticky ex:bottom-0 ex:z-[2]">

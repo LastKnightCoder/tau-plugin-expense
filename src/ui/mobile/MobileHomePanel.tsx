@@ -3,12 +3,13 @@
  * 麦克风就地弹出语音记账，「记一笔」进记账页并聚焦记账条。
  */
 import { useState } from "react";
-import type { PluginHomePanelProps } from "@tau/plugins";
+import { useI18n, type PluginHomePanelProps } from "@tau/plugins";
 import { Mic, Plus } from "lucide-react";
 import { cn, toast } from "@tau/ui";
 import { monthOf } from "../../data/model";
 import { isFixed } from "../../data/stats";
 import { useRuntime } from "../../runtime";
+import { messages } from "../../i18n";
 import { yuan } from "../bits";
 import { useLedger, useNow } from "../queries";
 import { Bar } from "./parts";
@@ -18,6 +19,7 @@ import { VoiceSheet, type VoiceRequest } from "./VoiceSheet";
 
 export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
   const { pages } = useRuntime();
+  const { t } = useI18n(messages);
   const { today } = useNow();
   const query = useLedger(monthOf(today), today);
   const [voice, setVoice] = useState<VoiceRequest | null>(null);
@@ -34,7 +36,7 @@ export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
       <div className="ex:flex ex:min-h-[96px] ex:flex-1 ex:flex-col">
         {talk.active ? (
           <p className="ex:mt-1 ex:line-clamp-3 ex:text-[13px] ex:leading-[1.5] ex:font-semibold">
-            {talk.preview || <span className="ex:text-ink-3 ex:font-normal">{talk.connecting ? "正在连接…" : "说说花了什么钱"}</span>}
+            {talk.preview || <span className="ex:text-ink-3 ex:font-normal">{talk.connecting ? t("talk.connecting") : t("talk.hintShort")}</span>}
           </p>
         ) : (
           <>
@@ -43,12 +45,12 @@ export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
             </b>
             <span className={cn("ex:mt-0.5 ex:truncate ex:text-[11.5px]", fast && left >= 0 ? "ex:text-danger" : "ex:text-ink-2")}>
               {stat.budget <= 0
-                ? `本月已花 · 今天 ${yuan(todaySpent)}`
+                ? t("mhp.spentToday", { amount: yuan(todaySpent) })
                 : left < 0
-                  ? `本月已超预算 · 剩 ${stat.daysLeft} 天`
+                  ? t("mhp.overLeft", { days: stat.daysLeft })
                   : fast
-                    ? `比时间进度快 ${Math.round((stat.paceRatio - stat.pace) * 100)}%`
-                    : `本月还能花 · 剩 ${stat.daysLeft} 天`}
+                    ? t("summary.faster", { percent: Math.round((stat.paceRatio - stat.pace) * 100) })
+                    : t("home.remaining", { days: stat.daysLeft })}
             </span>
             {stat.budget > 0 && <Bar className="ex:mt-[7px] ex:h-1.5" ratio={stat.total / stat.budget} pace={stat.pace} danger={fast} />}
           </>
@@ -56,7 +58,7 @@ export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
         <span className="ex:mt-auto ex:flex ex:gap-1.5 ex:pt-2">
           <button
             type="button"
-            aria-label="按住说话记一笔"
+            aria-label={t("mhp.talkAria")}
             onClick={event => event.stopPropagation()}
             {...talk.bind}
             className={cn(button, "ex:flex-1 ex:touch-none ex:select-none", talk.active ? "ex:bg-accent ex:text-ink-inverse" : "ex:bg-hover ex:text-ink-1")}
@@ -72,7 +74,7 @@ export function MobileHomePanel({ registerDismiss }: PluginHomePanelProps) {
             className={cn(button, "ex:bg-accent-soft ex:text-accent-text ex:flex-[2.4]")}
           >
             <Plus />
-            记一笔
+            {t("calendar.logToday")}
           </button>
         </span>
       </div>

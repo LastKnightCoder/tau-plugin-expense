@@ -4,12 +4,14 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw, Sparkles } from "lucide-react";
-import { aiErrorMessage, needsSetup, type AIScope, type AnalysisInput } from "../../ai";
+import { useI18n } from "@tau/plugins";
+import { aiErrorKey, needsSetup, type AIScope, type AnalysisInput } from "../../ai";
 import type { Category } from "../../data/model";
 import type { MonthTotal } from "../../data/stats";
 import { useRuntime } from "../../runtime";
+import { messages, type MessageKey } from "../../i18n";
 import { Rendered } from "../AIPanel";
-import { categoryColor, yuan } from "../bits";
+import { categoryColor, monthLabel, yuan } from "../bits";
 import { MonthsChart, WeekdayBars } from "../Review";
 import { CardTitle, MCard, PrimaryButton, TextTabs } from "./parts";
 
@@ -30,21 +32,23 @@ export function ReviewView({
   aiInput: AnalysisInput;
   stamp: string;
 }) {
+  const { t, locale } = useI18n(messages);
   const [selected, setSelected] = useState(current);
   const picked = months.find(m => m.month === selected) ?? null;
   return (
     <div className="ex:flex ex:flex-col ex:gap-3 ex:pt-1 ex:pb-6">
       <MCard className="ex:px-3">
         <div className="ex:px-1">
-          <CardTitle title="近 6 个月" note={budget > 0 ? `虚线 = 月预算 ${yuan(budget)}` : "点柱子看那个月"} />
+          <CardTitle title={t("review.title")} note={budget > 0 ? t("review.budgetLine", { amount: yuan(budget) }) : t("review.switchNote")} />
         </div>
         <MonthsChart months={months} categories={categories} budget={budget} selected={selected} current={current} onPick={setSelected} />
         {picked && (
           <div className="ex:border-line-2 ex:mx-1 ex:mt-1 ex:border-t ex:pt-2">
             <div className="ex:text-ink-3 ex:flex ex:text-[11.5px]">
-              {picked.month.slice(0, 4)} 年 {Number(picked.month.slice(5))} 月{picked.month === current ? " · 进行中" : ""}
+              {t("date.yearMonth", { year: picked.month.slice(0, 4), month: monthLabel(picked.month, locale) })}
+              {picked.month === current ? t("review.inProgressSuffix") : ""}
               <span className="ex:flex-1" />
-              合计 <b className="ex:text-ink-1 ex:ml-1 ex:tabular-nums">{yuan(picked.total)}</b>
+              {t("review.total")} <b className="ex:text-ink-1 ex:ml-1 ex:tabular-nums">{yuan(picked.total)}</b>
             </div>
             <div className="ex:mt-1.5 ex:grid ex:grid-cols-2 ex:gap-x-4 ex:gap-y-1 ex:text-[12px]">
               {categories
@@ -63,7 +67,7 @@ export function ReviewView({
       </MCard>
       <MCard className="ex:px-0 ex:pb-0">
         <div className="ex:px-4">
-          <CardTitle title="一周里哪天花得多" note="近 90 天日均可控支出" />
+          <CardTitle title={t("review.weekdayTitle")} note={t("review.weekdayNote")} />
         </div>
         <WeekdayBars weekday={weekday} />
       </MCard>
@@ -74,9 +78,10 @@ export function ReviewView({
 
 function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
   const { ai, context } = useRuntime();
+  const { t } = useI18n(messages);
   const [scope, setScope] = useState<AIScope>("tip");
   const [results, setResults] = useState<Partial<Record<AIScope, { text: string; stamp: string; done: boolean }>>>({});
-  const [error, setError] = useState<{ scope: AIScope; message: string; setup: boolean } | null>(null);
+  const [error, setError] = useState<{ scope: AIScope; key: MessageKey; setup: boolean } | null>(null);
   const [running, setRunning] = useState<AIScope | null>(null);
   const [contentHeight, setContentHeight] = useState(0);
   const content = useRef<HTMLDivElement>(null);
@@ -110,8 +115,8 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
         delete next[target];
         return next;
       });
-      const message = aiErrorMessage(err);
-      if (message) setError({ scope: target, message, setup: needsSetup(err) });
+      const key = aiErrorKey(err);
+      if (key) setError({ scope: target, key, setup: needsSetup(err) });
     } finally {
       if (controller.current === current) {
         controller.current = null;
@@ -134,8 +139,8 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
           setContentHeight(0);
         }}
         options={[
-          ["tip", "提醒"],
-          ["review", "月度复盘"],
+          ["tip", t("ai.tip")],
+          ["review", t("ai.review")],
         ]}
       />
       <div ref={content} style={{ minHeight: contentHeight }} aria-busy={streaming}>
@@ -144,11 +149,11 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
             <Rendered text={result.text} streaming={streaming} />
             {stale && (
               <div className="ex:text-ink-3 ex:mt-2.5 ex:flex ex:items-center ex:gap-1.5 ex:text-[12px]">
-                记录有变化，结果可能过时
+                {t("ai.staleMobile")}
                 <span className="ex:flex-1" />
                 <PrimaryButton small ghost disabled={running !== null} onClick={() => void run()}>
                   <RefreshCw />
-                  重新分析
+                  {t("ai.rerun")}
                 </PrimaryButton>
               </div>
             )}
@@ -156,12 +161,12 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
         ) : (
           <p className="ex:text-ink-2 ex:pt-2 ex:text-center ex:text-[13px] ex:leading-[1.7]">
             {streaming
-              ? "正在分析，请稍候…"
+              ? t("ai.analyzing")
               : visibleError
-                ? visibleError.message
+                ? t(visibleError.key)
                 : scope === "tip"
-                  ? "看看剩下几天每天最多花多少，哪类要收着点"
-                  : "看这个月比平时多花在哪，给出能省多少的建议"}
+                  ? t("ai.tipHint")
+                  : t("ai.reviewHint")}
           </p>
         )}
         {!result?.done && (
@@ -173,15 +178,15 @@ function AICard({ input, stamp }: { input: AnalysisInput; stamp: string }) {
               onClick={() => (visibleError?.setup ? void context.ai.openSettings() : void run())}
             >
               {visibleError?.setup ? (
-                "去配置模型"
+                t("common.configureModel")
               ) : (
                 <>
                   <Sparkles />
-                  {streaming ? "分析中…" : visibleError ? "重试" : scope === "tip" ? "开始分析" : "开始复盘"}
+                  {streaming ? t("ai.running") : visibleError ? t("ai.retry") : scope === "tip" ? t("ai.startTip") : t("ai.startReview")}
                 </>
               )}
             </PrimaryButton>
-            <p className="ex:text-ink-3 ex:mt-2.5 ex:text-[11px]">AI 只读取分类金额和备注文字，点了才分析</p>
+            <p className="ex:text-ink-3 ex:mt-2.5 ex:text-[11px]">{t("ai.footMobile")}</p>
           </div>
         )}
       </div>

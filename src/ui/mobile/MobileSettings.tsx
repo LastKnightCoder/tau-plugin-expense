@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSettingsDraft, type PluginPageContext } from "@tau/plugins";
+import { useI18n, useSettingsDraft, type PluginPageContext } from "@tau/plugins";
 import { ChevronRight, History, Plus, Trash2 } from "lucide-react";
 import { Loading, cn, toast } from "@tau/ui";
 import {
@@ -25,6 +25,7 @@ import {
 import { baseline } from "../../data/stats";
 import { configChanges } from "../../data/changes";
 import { EXPENSE_KEY, useRuntime } from "../../runtime";
+import { messages } from "../../i18n";
 import { ICONS, yuan } from "../bits";
 import { useConfig, useLedger, useNow } from "../queries";
 import { AmountDisplay, AmountPad, CatIcon, PrimaryButton } from "./parts";
@@ -37,6 +38,7 @@ type Editing = { kind: "cat"; index: number | null } | { kind: "rec"; index: num
 
 export function MobileSettings({ pageContext }: { pageContext?: PluginPageContext }) {
   const { data, context } = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const config = useConfig();
   const { today } = useNow();
@@ -85,7 +87,7 @@ export function MobileSettings({ pageContext }: { pageContext?: PluginPageContex
     await client.invalidateQueries({ queryKey: EXPENSE_KEY });
     setDraft(parseConfig(configToJson(draft)));
     setRemoved([]);
-    return moved ? `已保存，${moved} 笔流水移到了「其他」` : undefined;
+    return moved ? t("settings.savedToast", { count: moved }) : undefined;
   };
   const restore = () => {
     setDraft(structuredClone(config.data!));
@@ -93,7 +95,7 @@ export function MobileSettings({ pageContext }: { pageContext?: PluginPageContex
   };
   const hostDraft = useSettingsDraft({
     dirty: dirty || removed.length > 0,
-    changes: draft && config.data ? configChanges(config.data, draft) : [],
+    changes: draft && config.data ? configChanges(config.data, draft, t) : [],
     save: commit,
     reset: restore,
   });
@@ -108,10 +110,10 @@ export function MobileSettings({ pageContext }: { pageContext?: PluginPageContex
     setSaving(true);
     try {
       const text = await commit();
-      toast.success(text ?? "已保存");
+      toast.success(text ?? t("common.saved"));
       return true;
     } catch {
-      toast.error("保存失败");
+      toast.error(t("common.saveFailed"));
       return false;
     } finally {
       setSaving(false);
@@ -157,13 +159,13 @@ export function MobileSettings({ pageContext }: { pageContext?: PluginPageContex
   return (
     <SheetHost.Provider value={pageContext ?? null}>
     <div className="ex:flex ex:flex-col ex:gap-2.5 ex:pb-2">
-      <h3 className="ex:text-ink-3 ex:px-1 ex:text-[12px]">分类与月预算 · 合计 {yuan(total)}</h3>
+      <h3 className="ex:text-ink-3 ex:px-1 ex:text-[12px]">{t("ms.catHeader", { amount: yuan(total) })}</h3>
       <div className="ex:divide-line-2 ex:divide-y">
         {draft.categories.map((c, i) => (
           <button key={c.id} type="button" className={ROW} onClick={() => setEditing({ kind: "cat", index: i })}>
             <CatIcon category={c} size={26} />
             <span className="ex:min-w-0 ex:flex-1 ex:truncate">{c.name}</span>
-            <b className={cn("ex:font-semibold ex:tabular-nums", !c.budget && "ex:text-ink-3 ex:font-normal")}>{c.budget ? yuan(c.budget) : "不设"}</b>
+            <b className={cn("ex:font-semibold ex:tabular-nums", !c.budget && "ex:text-ink-3 ex:font-normal")}>{c.budget ? yuan(c.budget) : t("settings.noBudgetPh")}</b>
             <ChevronRight className="ex:text-ink-3 ex:size-4" />
           </button>
         ))}
@@ -172,19 +174,19 @@ export function MobileSettings({ pageContext }: { pageContext?: PluginPageContex
         {draft.categories.length < MAX_CATEGORIES && (
           <PrimaryButton small ghost className="ex:flex-1" onClick={() => setEditing({ kind: "cat", index: null })}>
             <Plus />
-            新增分类
+            {t("settings.addCat")}
           </PrimaryButton>
         )}
         {base.length > 0 && (
           <PrimaryButton small ghost className="ex:flex-[1.4]" onClick={fillFromHistory}>
             <History />
-            按前 {base.length} 个月平均填入
+            {t("settings.fillAvg", { count: base.length })}
           </PrimaryButton>
         )}
       </div>
-      {removed.length > 0 && <p className="ex:text-ink-3 ex:px-1 ex:text-[12px]">删除的分类里的流水，保存后会移到「其他」。</p>}
+      {removed.length > 0 && <p className="ex:text-ink-3 ex:px-1 ex:text-[12px]">{t("settings.removedNote")}</p>}
 
-      <h3 className="ex:text-ink-3 ex:mt-3 ex:px-1 ex:text-[12px]">固定支出 · 每月自动记一笔</h3>
+      <h3 className="ex:text-ink-3 ex:mt-3 ex:px-1 ex:text-[12px]">{t("ms.recHeader")}</h3>
       <div className="ex:divide-line-2 ex:divide-y">
         {draft.recurring.map((r, i) => {
           const cat = draft.categories.find(c => c.id === r.category) ?? null;
@@ -192,28 +194,28 @@ export function MobileSettings({ pageContext }: { pageContext?: PluginPageContex
             <button key={r.id} type="button" className={ROW} onClick={() => setEditing({ kind: "rec", index: i })}>
               <CatIcon category={cat} size={26} />
               <span className="ex:min-w-0 ex:flex-1 ex:truncate">{r.note}</span>
-              <span className="ex:text-ink-3 ex:text-[12.5px]">每月 {r.day} 号</span>
+              <span className="ex:text-ink-3 ex:text-[12.5px]">{t("ms.recDay", { day: r.day })}</span>
               <b className="ex:font-semibold ex:tabular-nums">{yuan(r.cents)}</b>
               <ChevronRight className="ex:text-ink-3 ex:size-4" />
             </button>
           );
         })}
-        {!draft.recurring.length && <p className="ex:text-ink-3 ex:py-3 ex:text-[12.5px]">房租、话费、会员这类每月不变的，填一次到日子自动记一笔，不计入月历和日均。</p>}
+        {!draft.recurring.length && <p className="ex:text-ink-3 ex:py-3 ex:text-[12.5px]">{t("ms.recEmpty")}</p>}
       </div>
       <PrimaryButton small ghost onClick={() => setEditing({ kind: "rec", index: null })}>
         <Plus />
-        新增固定支出
+        {t("settings.addRec")}
       </PrimaryButton>
 
       {!hostDraft && (
         <div className="ex:mt-3 ex:flex ex:gap-2">
           {dirty && (
             <PrimaryButton ghost className="ex:flex-1" onClick={restore}>
-              还原
+              {t("common.reset")}
             </PrimaryButton>
           )}
           <PrimaryButton className="ex:flex-[2]" disabled={!dirty || saving} onClick={() => void save()}>
-            {dirty ? "保存" : "已保存"}
+            {dirty ? t("common.save") : t("common.saved")}
           </PrimaryButton>
         </div>
       )}
@@ -258,11 +260,11 @@ export function MobileSettings({ pageContext }: { pageContext?: PluginPageContex
           }
         />
       )}
-      <Sheet open={asking} onClose={() => answerLeave(false)} title="有改动还没保存">
-        <p className="ex:text-ink-2 ex:mt-1 ex:text-[13px]">离开后这次的修改不会保留。</p>
+      <Sheet open={asking} onClose={() => answerLeave(false)} title={t("ms.unsavedTitle")}>
+        <p className="ex:text-ink-2 ex:mt-1 ex:text-[13px]">{t("ms.unsavedBody")}</p>
         <div className="ex:mt-4 ex:flex ex:gap-2">
           <PrimaryButton ghost className="ex:flex-1" onClick={() => answerLeave(true)}>
-            不保存，离开
+            {t("ms.leaveWithoutSave")}
           </PrimaryButton>
           <PrimaryButton
             className="ex:flex-1"
@@ -270,7 +272,7 @@ export function MobileSettings({ pageContext }: { pageContext?: PluginPageContex
               void save().then(ok => ok && answerLeave(true))
             }
           >
-            保存
+            {t("common.save")}
           </PrimaryButton>
         </div>
       </Sheet>
@@ -299,6 +301,7 @@ function CategorySheet({
   onSave(next: Category): void;
   onDelete: (() => void) | null;
 }) {
+  const { t } = useI18n(messages);
   const [name, setName] = useState(category?.name ?? "");
   const [icon, setIcon] = useState(category?.icon ?? "tag");
   const [budget, setBudget] = useState(toYuanText(category?.budget ?? 0));
@@ -310,14 +313,14 @@ function CategorySheet({
     <Sheet
       open
       onClose={onClose}
-      title={category ? category.name : "新增分类"}
+      title={category ? category.name : t("settings.addCat")}
       trailing={
         padding ? (
           <button type="button" onClick={() => setPadding(false)} className="ex:text-accent-text ex:h-8 ex:px-1 ex:text-[13.5px] ex:font-semibold">
-            完成
+            {t("common.done")}
           </button>
         ) : onDelete ? (
-          <button type="button" aria-label="删除分类" onClick={onDelete} className="ex:text-danger ex:grid ex:size-8 ex:place-items-center">
+          <button type="button" aria-label={t("ms.deleteCatAria")} onClick={onDelete} className="ex:text-danger ex:grid ex:size-8 ex:place-items-center">
             <Trash2 className="ex:size-[18px]" />
           </button>
         ) : null
@@ -325,31 +328,31 @@ function CategorySheet({
     >
       {padding ? (
         <>
-          <AmountDisplay value={budget} placeholder="不设" caret />
-          {average != null && <p className="ex:text-ink-3 ex:mb-3 ex:text-center ex:text-[12px]">前 3 个月平均 {yuan(average)} · 清空表示不设</p>}
+          <AmountDisplay value={budget} placeholder={t("settings.noBudgetPh")} caret />
+          {average != null && <p className="ex:text-ink-3 ex:mb-3 ex:text-center ex:text-[12px]">{t("ms.catAvgNote", { amount: yuan(average) })}</p>}
           <AmountPad value={budget} onChange={setBudget} />
         </>
       ) : (
         <>
           <div className="ex:divide-line-2 ex:mt-1 ex:divide-y">
             <label className={ROW}>
-              <span className="ex:text-ink-3 ex:w-14 ex:shrink-0">名称</span>
+              <span className="ex:text-ink-3 ex:w-14 ex:shrink-0">{t("settings.nameField")}</span>
               <input
                 value={name}
                 maxLength={12}
                 onChange={e => setName(e.target.value)}
-                placeholder="比如「宠物」"
+                placeholder={t("ms.namePhExample")}
                 className="ex:placeholder:text-ink-3 ex:min-w-0 ex:flex-1 ex:bg-transparent ex:outline-none"
               />
             </label>
             <button type="button" className={ROW} onClick={() => setPadding(true)}>
-              <span className="ex:text-ink-3 ex:w-14 ex:shrink-0">月预算</span>
-              <b className={cn("ex:font-semibold ex:tabular-nums", !cents && "ex:text-ink-3 ex:font-normal")}>{cents ? yuan(cents) : "不设"}</b>
+              <span className="ex:text-ink-3 ex:w-14 ex:shrink-0">{t("ms.budgetField")}</span>
+              <b className={cn("ex:font-semibold ex:tabular-nums", !cents && "ex:text-ink-3 ex:font-normal")}>{cents ? yuan(cents) : t("settings.noBudgetPh")}</b>
               <span className="ex:flex-1" />
-              {average != null && <span className="ex:text-ink-3 ex:text-[12px]">前 3 个月平均 {yuan(average)}</span>}
+              {average != null && <span className="ex:text-ink-3 ex:text-[12px]">{t("ms.catAvgShort", { amount: yuan(average) })}</span>}
             </button>
           </div>
-          <p className="ex:text-ink-3 ex:mt-2.5 ex:mb-1.5 ex:text-[12px]">图标</p>
+          <p className="ex:text-ink-3 ex:mt-2.5 ex:mb-1.5 ex:text-[12px]">{t("ms.iconLabel")}</p>
           <div className="ex:grid ex:grid-cols-6 ex:gap-1.5">
             {Object.keys(ICONS).map(key => (
               <button
@@ -364,7 +367,7 @@ function CategorySheet({
               </button>
             ))}
           </div>
-          {onDelete && <p className="ex:text-ink-3 ex:px-1 ex:pt-2.5 ex:text-[11.5px]">删除后，这一类的流水移到「其他」，金额不会丢。</p>}
+          {onDelete && <p className="ex:text-ink-3 ex:px-1 ex:pt-2.5 ex:text-[11.5px]">{t("ms.deleteCatNote")}</p>}
         </>
       )}
       <PrimaryButton
@@ -372,7 +375,7 @@ function CategorySheet({
         disabled={!valid}
         onClick={() => onSave({ id: category?.id ?? newId("c"), name: name.trim(), icon, color: category?.color ?? color, budget: cents ?? 0 })}
       >
-        完成
+        {t("common.done")}
       </PrimaryButton>
     </Sheet>
   );
@@ -393,6 +396,7 @@ function RecurringSheet({
   onSave(next: Recurring): void;
   onDelete: (() => void) | null;
 }) {
+  const { t } = useI18n(messages);
   const [note, setNote] = useState(rule?.note ?? "");
   const [amount, setAmount] = useState(toYuanText(rule?.cents ?? 0));
   const [category, setCategory] = useState(rule?.category ?? (categories.some(c => c.id === "home") ? "home" : OTHER));
@@ -409,7 +413,7 @@ function RecurringSheet({
     <Sheet
       open
       onClose={onClose}
-      title={rule ? "固定支出" : "新增固定支出"}
+      title={rule ? t("settings.recTitle") : t("settings.addRec")}
       trailing={
         padding || picking ? (
           <button
@@ -420,10 +424,10 @@ function RecurringSheet({
             }}
             className="ex:text-accent-text ex:h-8 ex:px-1 ex:text-[13.5px] ex:font-semibold"
           >
-            完成
+            {t("common.done")}
           </button>
         ) : onDelete ? (
-          <button type="button" aria-label="删除这条固定支出" onClick={onDelete} className="ex:text-danger ex:grid ex:size-8 ex:place-items-center">
+          <button type="button" aria-label={t("settings.deleteRecAria", { name: t("settings.thisRule") })} onClick={onDelete} className="ex:text-danger ex:grid ex:size-8 ex:place-items-center">
             <Trash2 className="ex:size-[18px]" />
           </button>
         ) : null
@@ -458,41 +462,42 @@ function RecurringSheet({
         <>
           <div className="ex:divide-line-2 ex:mt-1 ex:divide-y">
             <label className={ROW}>
-              <span className="ex:text-ink-3 ex:w-14 ex:shrink-0">名称</span>
+              <span className="ex:text-ink-3 ex:w-14 ex:shrink-0">{t("settings.nameField")}</span>
               <input
                 value={note}
                 maxLength={40}
                 onChange={e => setNote(e.target.value)}
-                placeholder="房租"
+                placeholder={t("settings.namePh")}
                 className="ex:placeholder:text-ink-3 ex:min-w-0 ex:flex-1 ex:bg-transparent ex:outline-none"
               />
             </label>
             <button type="button" className={ROW} onClick={() => setPadding(true)}>
-              <span className="ex:text-ink-3 ex:w-14 ex:shrink-0">金额</span>
-              <b className={cn("ex:font-semibold ex:tabular-nums", cents == null && "ex:text-ink-3 ex:font-normal")}>{cents != null ? yuan(cents) : "填金额"}</b>
+              <span className="ex:text-ink-3 ex:w-14 ex:shrink-0">{t("settings.amountPh")}</span>
+              <b className={cn("ex:font-semibold ex:tabular-nums", cents == null && "ex:text-ink-3 ex:font-normal")}>{cents != null ? yuan(cents) : t("voice.fillAmount")}</b>
             </button>
             <button type="button" className={ROW} onClick={() => setPicking(true)}>
-              <span className="ex:text-ink-3 ex:w-14 ex:shrink-0">分类</span>
+              <span className="ex:text-ink-3 ex:w-14 ex:shrink-0">{t("common.category")}</span>
               <CatIcon category={cat} size={24} />
-              {cat?.name ?? "其他"}
+              {cat?.name ?? t("common.otherCategory")}
               <ChevronRight className="ex:text-ink-3 ex:ml-auto ex:size-4" />
             </button>
             <label className={ROW}>
-              <span className="ex:text-ink-3 ex:w-14 ex:shrink-0">每月</span>
+              <span className="ex:text-ink-3 ex:w-14 ex:shrink-0">{t("settings.monthlyPrefix")}</span>
               <input
                 inputMode="numeric"
                 value={day}
                 onChange={e => setDay(e.target.value.replace(/[^\d]/g, "").slice(0, 2))}
-                aria-label="每月几号"
+                aria-label={t("settings.dayAria")}
                 className="ex:w-10 ex:bg-transparent ex:font-semibold ex:tabular-nums ex:outline-none"
               />
-              号<span className={cn("ex:ml-auto ex:text-[12px]", dayOk ? "ex:text-ink-3" : "ex:text-danger")}>1–28 号</span>
+              {t("settings.monthlySuffix")}
+              <span className={cn("ex:ml-auto ex:text-[12px]", dayOk ? "ex:text-ink-3" : "ex:text-danger")}>{t("settings.dayRange")}</span>
             </label>
           </div>
           <p className="ex:text-ink-3 ex:px-1 ex:pt-2 ex:text-[11.5px] ex:leading-[1.6]">
-            到日子自动记一笔，单独标出，不计入月历和日均额度。
-            {!rule && passed ? `本月 ${dayNum} 号已过，保存后立即补记本月这笔。` : ""}
-            {rule ? "删掉后已记的流水保留。" : ""}
+            {t("ms.recBehavior")}
+            {!rule && passed ? t("ms.recBackfill", { day: dayNum }) : ""}
+            {rule ? t("ms.recKeep") : ""}
           </p>
         </>
       )}
@@ -501,7 +506,7 @@ function RecurringSheet({
         disabled={!valid}
         onClick={() => onSave({ id: rule?.id ?? newId("r"), note: note.trim(), cents: cents!, category, day: dayNum })}
       >
-        {rule ? "完成" : "添加"}
+        {rule ? t("common.done") : t("common.add")}
       </PrimaryButton>
     </Sheet>
   );

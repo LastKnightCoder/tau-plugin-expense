@@ -3,8 +3,9 @@
  * 识别经 context.speech（沿用应用的语音输入设置），不可用时轻点或按住都提示原因。
  */
 import { useEffect, useRef, useState, type PointerEvent } from "react";
-import type { PluginSpeechSession } from "@tau/plugins";
+import { useI18n, type PluginSpeechSession } from "@tau/plugins";
 import { useRuntime } from "../../runtime";
+import { messages } from "../../i18n";
 
 const HOLD_MS = 250;
 const CANCEL_PX = 60;
@@ -26,6 +27,7 @@ export interface HoldToTalk {
 
 export function useHoldToTalk({ onText, onError }: { onText(text: string): void; onError(message: string): void }): HoldToTalk {
   const { context } = useRuntime();
+  const { t } = useI18n(messages);
   const [active, setActive] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [preview, setPreview] = useState("");
@@ -72,7 +74,7 @@ export function useHoldToTalk({ onText, onError }: { onText(text: string): void;
         return session;
       })
       .catch(error => {
-        if (!controller.signal.aborted) latest.current.onError(speechError(error));
+        if (!controller.signal.aborted) latest.current.onError(speechErrorText(t, error));
         reset();
         return null;
       });
@@ -84,7 +86,7 @@ export function useHoldToTalk({ onText, onError }: { onText(text: string): void;
     window.clearTimeout(current.timer);
     if (!current.session) {
       reset();
-      if (!cancel) latest.current.onError(unavailable ?? "按住说话，说说花了什么钱");
+      if (!cancel) latest.current.onError(unavailable ?? t("hold.defaultHint"));
       return;
     }
     const session = await current.session;
@@ -98,10 +100,10 @@ export function useHoldToTalk({ onText, onError }: { onText(text: string): void;
       const text = (await session.result).trim();
       reset();
       if (text) latest.current.onText(text);
-      else latest.current.onError("没听清，再说一次");
+      else latest.current.onError(t("hold.notClear"));
     } catch (error) {
       reset();
-      if (!current.controller?.signal.aborted) latest.current.onError(speechError(error));
+      if (!current.controller?.signal.aborted) latest.current.onError(speechErrorText(t, error));
     }
   };
 
@@ -139,9 +141,10 @@ export function useHoldToTalk({ onText, onError }: { onText(text: string): void;
   };
 }
 
-function speechError(error: unknown): string {
+/** 宿主的原始诊断保持透传；能识别的失败按词典 key 翻译 */
+function speechErrorText(t: (key: "hold.authFailed" | "hold.failed") => string, error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/^SPEECH_UNAVAILABLE[：:]/.test(message)) return message.replace(/^SPEECH_UNAVAILABLE[：:]\s*/, "");
-  if (/未授权|未声明/.test(message)) return "没有授权使用语音输入";
-  return "语音输入失败";
+  if (/未授权|未声明/.test(message)) return t("hold.authFailed");
+  return t("hold.failed");
 }

@@ -7,12 +7,14 @@
 import { useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, Calendar, History, Mic, Sparkles, TriangleAlert } from "lucide-react";
+import { useI18n } from "@tau/plugins";
 import { cn, toast } from "@tau/ui";
-import { aiErrorMessage, needsSetup } from "../../ai";
+import { aiErrorKey, needsSetup } from "../../ai";
 import { OTHER, addDays, dateKey, monthOf, timeKey, type Config, type Tx } from "../../data/model";
 import { parseLine } from "../../data/parse";
 import type { MonthStat } from "../../data/stats";
 import { useRuntime } from "../../runtime";
+import { messages, type MessageKey } from "../../i18n";
 import { dayLabel, yuan } from "../bits";
 import { useAliases } from "../queries";
 import { addTxs, removeWithUndo } from "./actions";
@@ -47,13 +49,14 @@ export function LogBar({
 }) {
   const runtime = useRuntime();
   const { ai, context } = runtime;
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const aliases = useAliases();
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
   const [pick, setPick] = useState<{ note: string; category: string } | null>(null);
   const [classifying, setClassifying] = useState(false);
-  const [aiError, setAiError] = useState<{ message: string; setup: boolean } | null>(null);
+  const [aiError, setAiError] = useState<{ key: MessageKey; setup: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef<AbortController | null>(null);
@@ -90,8 +93,8 @@ export function LogBar({
       if (!controller.signal.aborted && !context.signal.aborted) setPick({ note: draft.note, category: id });
     } catch (err) {
       if (controller.signal.aborted) return;
-      const message = aiErrorMessage(err);
-      if (message) setAiError({ message, setup: needsSetup(err) });
+      const key = aiErrorKey(err);
+      if (key) setAiError({ key, setup: needsSetup(err) });
     } finally {
       if (!controller.signal.aborted) setClassifying(false);
     }
@@ -99,7 +102,7 @@ export function LogBar({
 
   const submit = async () => {
     if (!draft || draft.cents == null || saving) {
-      if (draft && draft.cents == null) toast.info("写上金额，比如「奶茶 18」");
+      if (draft && draft.cents == null) toast.info(t("logbar.needAmount"));
       return;
     }
     const target = category ?? OTHER;
@@ -118,15 +121,22 @@ export function LogBar({
         },
       ]);
       if (context.signal.aborted) return;
-      const name = config.categories.find(c => c.id === target)?.name ?? "其他";
+      const name = config.categories.find(c => c.id === target)?.name ?? t("common.otherCategory");
       const after = catLeft(target, draft.cents);
-      toast.success(`记下 ${draft.note || name} ${yuan(draft.cents)}${after != null ? ` · ${name}${after < 0 ? `超了 ${yuan(-after)}` : `还剩 ${yuan(after)}`}` : ""}`, {
-        action: { label: "撤销", onClick: () => void removeWithUndo(runtime, client, tx) },
+      const parts = [t("logbar.saved", { name: draft.note || name, amount: yuan(draft.cents) })];
+      if (after != null)
+        parts.push(
+          after < 0
+            ? t("logbar.catOver", { cat: name, amount: yuan(-after) })
+            : t("logbar.catLeft", { cat: name, amount: yuan(after) })
+        );
+      toast.success(parts.join(" · "), {
+        action: { label: t("common.undo"), onClick: () => void removeWithUndo(runtime, client, tx, t) },
       });
       change("");
       onSaved?.(tx);
     } catch {
-      toast.error("记录失败");
+      toast.error(t("common.logFailed"));
     } finally {
       setSaving(false);
     }
@@ -145,10 +155,10 @@ export function LogBar({
   const chips = useMemo(() => {
     const seen = new Set<string>();
     const out: string[] = [];
-    for (const t of [...recent].reverse()) {
-      if (t.recurringId || !t.note || seen.has(t.note)) continue;
-      seen.add(t.note);
-      out.push(t.note);
+    for (const tx of [...recent].reverse()) {
+      if (tx.recurringId || !tx.note || seen.has(tx.note)) continue;
+      seen.add(tx.note);
+      out.push(tx.note);
       if (out.length >= 8) break;
     }
     return out;
@@ -204,14 +214,14 @@ export function LogBar({
               void submit();
             }
           }}
-          placeholder="午饭 牛肉面 28"
-          aria-label="一句话记一笔支出"
+          placeholder={t("logbar.placeholder")}
+          aria-label={t("quick.aria")}
           className="ex:placeholder:text-ink-3 ex:min-w-0 ex:flex-1 ex:bg-transparent ex:text-[15px] ex:outline-none"
         />
         {text.trim() ? (
           <button
             type="button"
-            aria-label="记下"
+            aria-label={t("quick.submitAria")}
             disabled={saving || draft?.cents == null}
             // 按下时不让输入框失焦，连续记账时键盘不收起
             onPointerDown={e => e.preventDefault()}
@@ -223,7 +233,7 @@ export function LogBar({
         ) : (
           <button
             type="button"
-            aria-label="按住说话"
+            aria-label={t("logbar.micAria")}
             {...talk.bind}
             className={cn(
               "ex:grid ex:size-10 ex:shrink-0 ex:touch-none ex:place-items-center ex:rounded-full ex:select-none",
@@ -260,11 +270,12 @@ function Preview({
   stat: MonthStat;
   source: "picked" | "alias" | "keyword" | null;
   classifying: boolean;
-  aiError: { message: string; setup: boolean } | null;
+  aiError: { key: MessageKey; setup: boolean } | null;
   onPick(id: string): void;
   onClassify(): void;
   onOpenAI(): void;
 }) {
+  const { t } = useI18n(messages);
   const [choosing, setChoosing] = useState(false);
   const sameMonth = monthOf(date) === stat.month;
   const catStat = cat ? stat.categories.find(c => c.id === cat.id) : null;
@@ -276,40 +287,41 @@ function Preview({
   const ordered = [...config.categories].sort(
     (a, b) => (stat.categories.find(c => c.id === b.id)?.spent ?? 0) - (stat.categories.find(c => c.id === a.id)?.spent ?? 0)
   );
+  const dayWord = draft.dayOffset === -1 ? t("date.yesterday") : t("date.dayBefore");
   const note =
     draft.dayOffset !== 0 ? (
       <>
         <Calendar className="ex:size-[11px]" />
-        {draft.dayOffset === -1 ? "昨天" : "前天"} · {dayLabel(date)}
+        {t("quick.dayPrefix", { day: `${dayWord} · ${dayLabel(t, date)}` })}
         {cat ? ` · ${cat.name}` : ""}
       </>
     ) : !cat ? (
-      draft.note ? `选一个分类，下次写「${draft.note}」自动归到这里` : "选一个分类"
+      draft.note ? t("logbar.pickHint", { note: draft.note }) : t("logbar.pickHintPlain")
     ) : (
       <>
         <History className="ex:size-[11px]" />
-        {cat.name} · {source === "alias" ? "按上次的归类" : source === "picked" ? "你选的" : "按关键词"}
+        {cat.name} · {source === "alias" ? t("logbar.byAlias") : source === "picked" ? t("logbar.byPicked") : t("logbar.byKeyword")}
       </>
     );
 
   return (
     <div className="ex:bg-surface ex:shadow-float ex:mb-2 ex:rounded-[20px] ex:px-3.5 ex:py-3">
       <div className="ex:flex ex:items-center ex:gap-2.5">
-        <button type="button" aria-label="换分类" onClick={() => setChoosing(v => !v)} onPointerDown={e => e.preventDefault()}>
+        <button type="button" aria-label={t("logbar.switchCatAria")} onClick={() => setChoosing(v => !v)} onPointerDown={e => e.preventDefault()}>
           <CatIcon category={cat} size={34} />
         </button>
         <span className="ex:min-w-0 ex:flex-1">
-          <b className="ex:block ex:truncate ex:text-[15px] ex:font-semibold">{draft.note || <span className="ex:text-ink-3">无备注</span>}</b>
+          <b className="ex:block ex:truncate ex:text-[15px] ex:font-semibold">{draft.note || <span className="ex:text-ink-3">{t("quick.noNote")}</span>}</b>
           <small className="ex:text-ink-3 ex:flex ex:items-center ex:gap-1 ex:truncate ex:text-[11px]">{note}</small>
         </span>
         {cents != null ? (
           <b className="ex:shrink-0 ex:text-[20px] ex:font-[750] ex:tabular-nums">{yuan(cents)}</b>
         ) : (
-          <span className="ex:text-warn ex:shrink-0 ex:text-[12.5px]">缺金额</span>
+          <span className="ex:text-warn ex:shrink-0 ex:text-[12.5px]">{t("quick.missingAmount")}</span>
         )}
       </div>
       {showChips ? (
-        <div className="ex:mt-2.5 ex:flex ex:flex-wrap ex:gap-1.5" role="radiogroup" aria-label="分类">
+        <div className="ex:mt-2.5 ex:flex ex:flex-wrap ex:gap-1.5" role="radiogroup" aria-label={t("common.category")}>
           {draft.note && !cat && (
             <button
               type="button"
@@ -319,7 +331,7 @@ function Preview({
               className="ex:bg-accent-soft ex:text-accent-text ex:flex ex:h-8 ex:items-center ex:gap-1 ex:rounded-full ex:px-3 ex:text-[12.5px] ex:font-semibold ex:disabled:opacity-60"
             >
               <Sparkles className={cn("ex:size-[13px]", classifying && "ex:animate-pulse")} />
-              {aiError?.setup ? "去配置模型" : classifying ? "归类中" : "AI 归类"}
+              {aiError?.setup ? t("common.configureModel") : classifying ? t("quick.classifying") : t("quick.aiClassify")}
             </button>
           )}
           {ordered.map(c => (
@@ -342,20 +354,18 @@ function Preview({
               {c.name}
             </button>
           ))}
-          {aiError && !aiError.setup && <span className="ex:text-ink-3 ex:basis-full ex:text-[11.5px]">{aiError.message}，点一下分类就行</span>}
+          {aiError && !aiError.setup && <span className="ex:text-ink-3 ex:basis-full ex:text-[11.5px]">{t("quick.errorHint", { message: t(aiError.key) })}</span>}
         </div>
       ) : catAfter != null && catAfter < 0 ? (
         <div className="ex:border-line-2 ex:text-danger ex:mt-2.5 ex:flex ex:items-center ex:gap-1.5 ex:border-t ex:pt-2.5 ex:text-[12px]">
           <TriangleAlert className="ex:size-[13px] ex:shrink-0" />
           {catStat!.spent > cat!.budget
-            ? `${cat!.name}已经超了 ${yuan(catStat!.spent - cat!.budget)}，记下后超 ${yuan(-catAfter)}`
-            : `记下后${cat!.name}超 ${yuan(-catAfter)}`}
+            ? t("logbar.alreadyOver", { cat: cat!.name, over: yuan(catStat!.spent - cat!.budget), after: yuan(-catAfter) })
+            : t("logbar.willOver", { cat: cat!.name, amount: yuan(-catAfter) })}
         </div>
       ) : catAfter != null && cat ? (
         <div className="ex:border-line-2 ex:text-ink-2 ex:mt-2.5 ex:flex ex:items-center ex:gap-2 ex:border-t ex:pt-2.5 ex:text-[12px]">
-          <span className="ex:shrink-0">
-            {cat.name}还剩 <b className="ex:text-ink-1 ex:font-[650] ex:tabular-nums">{yuan(catAfter)}</b>
-          </span>
+          <span className="ex:shrink-0">{t("logbar.catLeft", { cat: cat.name, amount: yuan(catAfter) })}</span>
           <Bar
             className="ex:h-1.5 ex:flex-1"
             ratio={catStat!.spent / cat.budget}
@@ -363,9 +373,7 @@ function Preview({
             pace={date === today ? stat.pace : null}
           />
           {monthAfter != null && (
-            <span className="ex:shrink-0">
-              本月 <b className={cn("ex:font-[650] ex:tabular-nums", monthAfter < 0 ? "ex:text-danger" : "ex:text-ink-1")}>{yuan(monthAfter)}</b>
-            </span>
+            <span className="ex:shrink-0">{t("logbar.monthAfter", { amount: yuan(monthAfter) })}</span>
           )}
         </div>
       ) : null}
@@ -374,10 +382,11 @@ function Preview({
 }
 
 function TalkPanel({ talk }: { talk: HoldToTalk }) {
+  const { t } = useI18n(messages);
   return (
     <div className="ex:bg-surface ex:shadow-float ex:mb-2 ex:rounded-[20px] ex:px-3.5 ex:pt-4 ex:pb-3.5 ex:text-center">
       <p className="ex:min-h-[44px] ex:text-left ex:text-[15px] ex:leading-[1.6] ex:font-semibold">
-        {talk.preview || <span className="ex:text-ink-3 ex:font-normal">{talk.connecting ? "正在连接…" : "说说花了什么钱，比如「午饭二十八」"}</span>}
+        {talk.preview || <span className="ex:text-ink-3 ex:font-normal">{talk.connecting ? t("talk.connecting") : t("talk.hint")}</span>}
       </p>
       <div aria-hidden className="ex:my-2.5 ex:flex ex:h-[30px] ex:items-center ex:justify-center ex:gap-[3px]">
         {Array.from({ length: 30 }, (_, i) => (
@@ -392,7 +401,7 @@ function TalkPanel({ talk }: { talk: HoldToTalk }) {
         ))}
       </div>
       <p className={cn("ex:text-[11.5px]", talk.cancelArmed ? "ex:text-danger" : "ex:text-ink-3")}>
-        {talk.cancelArmed ? "松开 取消" : "松开 整理 · 上滑 取消"}
+        {talk.cancelArmed ? t("talk.cancelHint") : t("talk.sendHint")}
       </p>
     </div>
   );

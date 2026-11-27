@@ -2,14 +2,17 @@
  * 首页「记账」卡：本月还能花多少（带时间进度条）、今天花了多少，下面是一句话记账。
  */
 import type { ReactNode } from "react";
+import { useI18n } from "@tau/plugins";
 import { cn } from "@tau/ui";
 import { monthOf } from "../data/model";
 import { dailyRoom, isFixed } from "../data/stats";
+import { messages } from "../i18n";
 import { Meter, yuan } from "./bits";
 import { QuickAdd } from "./QuickAdd";
 import { useLedger, useNow } from "./queries";
 
 export function HomePanel() {
+  const { t } = useI18n(messages);
   const { today } = useNow();
   const query = useLedger(monthOf(today), today);
   if (!query.data) return null;
@@ -23,12 +26,12 @@ export function HomePanel() {
     <div className="ex:flex ex:flex-col ex:gap-3">
       <div className="ex:grid ex:grid-cols-2 ex:gap-4">
         <Stat
-          label={stat.budget > 0 ? (left < 0 ? "本月已超" : `本月还能花 · 剩 ${stat.daysLeft} 天`) : "本月已花"}
+          label={stat.budget > 0 ? (left < 0 ? t("home.over") : t("home.remaining", { days: stat.daysLeft })) : t("home.spentThisMonth")}
           value={yuan(stat.budget > 0 ? Math.abs(left) : stat.total)}
           danger={left < 0 && stat.budget > 0}
           foot={stat.budget > 0 ? <Meter ratio={ratio} pace={stat.pace} color={fast ? "var(--tau-danger)" : "var(--tau-accent)"} className="ex:h-1.5 ex:w-full" /> : null}
         />
-        <Stat label="今天" value={yuan(todaySpent)} foot={stat.budget > 0 && left > 0 ? `每天最多 ${yuan(perDay)}` : null} />
+        <Stat label={t("date.today")} value={yuan(todaySpent)} foot={stat.budget > 0 && left > 0 ? t("summary.dailyRoomShort", { amount: yuan(perDay) }) : null} />
       </div>
       <QuickAdd today={today} config={config} stat={stat} />
     </div>

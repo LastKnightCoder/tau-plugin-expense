@@ -5,12 +5,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CATEGORIES, type Config } from "../data/model";
 import { monthStat } from "../data/stats";
 import { QuickAdd } from "../ui/QuickAdd";
+import zhCN from "../locales/zh-CN.json";
 
 const { addTx, invalidateQueries } = vi.hoisted(() => ({
   addTx: vi.fn(async (_input: unknown) => undefined),
   invalidateQueries: vi.fn(async () => undefined),
 }));
 
+// SDK 运行时由宿主提供：测试里给 useI18n 一个按简体词典直译的替身，defineI18n 用最小实现兜住词典求值
+vi.mock("@tau/plugins", () => ({
+  defineI18n: (config: { fallbackLocale: string; resources: Record<string, Record<string, string>> }) => ({
+    ...config,
+    ref: (key: string) => ({ kind: "i18n", key }),
+  }),
+  useI18n: () => ({
+    locale: "zh-CN",
+    t: (key: string) => (zhCN as Record<string, string>)[key] ?? key,
+    resolve: (value: unknown) => String(value),
+  }),
+}));
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries }),
 }));

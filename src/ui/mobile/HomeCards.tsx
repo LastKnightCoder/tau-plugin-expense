@@ -4,9 +4,11 @@
  */
 import { useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { AlertTriangle, Check, ChevronRight, Pencil, Repeat, Search, SlidersHorizontal, Trash2, Wallet } from "lucide-react";
+import { useI18n } from "@tau/plugins";
 import { cn } from "@tau/ui";
 import type { Category, Tx } from "../../data/model";
 import { dailyRoom, isFixed, type CategoryStat, type MonthStat } from "../../data/stats";
+import { messages } from "../../i18n";
 import { dayLabel, monthLabel, yuan } from "../bits";
 import { Bar, CardTitle, CatIcon, MCard } from "./parts";
 
@@ -25,6 +27,7 @@ export function HeroCard({
   /** 比上月同期多出最多的分类 */
   topDiff: { name: string; cents: number } | null;
 }) {
+  const { t, locale } = useI18n(messages);
   const left = stat.budget - stat.total;
   const fast = stat.budget > 0 && (left < 0 || stat.paceRatio > stat.pace);
   const perDay = dailyRoom(stat);
@@ -33,7 +36,11 @@ export function HeroCard({
     <MCard>
       <div className="ex:text-ink-3 ex:flex ex:items-center ex:gap-1.5 ex:text-[12px]">
         <Wallet className="ex:size-[13px]" />
-        {stat.budget > 0 ? `${monthLabel(stat.month)}${left < 0 ? "已超预算" : "还能花"} · 剩 ${stat.daysLeft} 天` : `${monthLabel(stat.month)}已花`}
+        {stat.budget > 0
+          ? left < 0
+            ? t("hero.overLeft", { month: monthLabel(stat.month, locale), days: stat.daysLeft })
+            : t("summary.remaining", { month: monthLabel(stat.month, locale), days: stat.daysLeft })
+          : t("hero.headSpent", { month: monthLabel(stat.month, locale) })}
       </div>
       <div className="ex:my-1.5 ex:flex ex:flex-wrap ex:items-center ex:gap-2">
         <b className={cn("ex:text-[34px] ex:leading-none ex:font-[750] ex:tracking-[-0.03em] ex:tabular-nums", left < 0 && stat.budget > 0 && "ex:text-danger")}>
@@ -47,7 +54,7 @@ export function HeroCard({
             )}
           >
             {fast ? <AlertTriangle className="ex:size-3" /> : <Check className="ex:size-3" />}
-            {left < 0 ? "已超预算" : fast ? `比时间进度快 ${Math.round((stat.paceRatio - stat.pace) * 100)}%` : "节奏正常"}
+            {left < 0 ? t("summary.overBudget") : fast ? t("summary.faster", { percent: Math.round((stat.paceRatio - stat.pace) * 100) }) : t("summary.paceOk")}
           </span>
         )}
       </div>
@@ -56,27 +63,33 @@ export function HeroCard({
           <Bar className="ex:mt-2.5" ratio={stat.total / stat.budget} pace={stat.pace} danger={fast} />
           <div className="ex:text-ink-3 ex:mt-2 ex:flex ex:text-[11.5px]">
             <span>
-              已花 <b className="ex:text-ink-1 ex:font-[650] ex:tabular-nums">{yuan(stat.total)}</b> / {yuan(stat.budget)}
+              {t("summary.spent")} <b className="ex:text-ink-1 ex:font-[650] ex:tabular-nums">{yuan(stat.total)}</b> / {yuan(stat.budget)}
             </span>
             <span className="ex:flex-1" />
             {left > 0 ? (
               <span>
-                剩下每天最多 <b className="ex:text-ink-1 ex:font-[650] ex:tabular-nums">{yuan(perDay)}</b>
+                {t("summary.dailyRoom", { amount: yuan(perDay) })}
               </span>
             ) : (
-              <span>剩下的天尽量只花必要的</span>
+              <span>{t("hero.tightNote")}</span>
             )}
           </div>
         </>
       )}
       <div className="ex:mt-3 ex:grid ex:grid-cols-3 ex:gap-2">
-        <Tile label="今天" value={yuan(today.cents)} note={`${today.count} 笔`} />
-        <Tile label="昨天" value={yuan(yesterday)} note={stat.allowance > 0 ? `日均额度 ${yuan(stat.allowance)}` : null} />
+        <Tile label={t("date.today")} value={yuan(today.cents)} note={t("common.txCount", { count: today.count })} />
+        <Tile label={t("summary.yesterday")} value={yuan(yesterday)} note={stat.allowance > 0 ? t("summary.allowance", { amount: yuan(stat.allowance) }) : null} />
         <Tile
-          label={`比${monthLabel(lastSame.month)}同期`}
+          label={t("summary.vsSame", { month: monthLabel(lastSame.month, locale) })}
           value={lastSame.total > 0 ? `${diff > 0 ? "+" : diff < 0 ? "−" : ""}${yuan(Math.abs(diff)).slice(1)}` : "—"}
           tone={lastSame.total > 0 && Math.abs(diff) >= 3000 ? (diff > 0 ? "up" : "down") : null}
-          note={lastSame.total > 0 ? (topDiff && diff > 0 ? `${topDiff.name}多了 ${yuan(topDiff.cents)}` : `同期 ${yuan(lastSame.total)}`) : "上月没有记录"}
+          note={
+            lastSame.total > 0
+              ? topDiff && diff > 0
+                ? t("hero.topDiff", { name: topDiff.name, amount: yuan(topDiff.cents) })
+                : t("hero.samePeriod", { amount: yuan(lastSame.total) })
+              : t("hero.noLastMonth")
+          }
         />
       </div>
     </MCard>
@@ -95,21 +108,22 @@ function Tile({ label, value, note, tone }: { label: string; value: string; note
 
 /** 吸顶的一行余额：主卡滚出屏幕后显示 */
 export function MiniHero({ stat, today }: { stat: MonthStat; today: number }) {
+  const { t } = useI18n(messages);
   const left = stat.budget - stat.total;
   return (
     <div className="ex:bg-surface ex:shadow-card ex:flex ex:items-center ex:gap-2.5 ex:rounded-[16px] ex:px-3.5 ex:py-2.5 ex:text-[13px]">
       <Wallet className="ex:text-accent ex:size-[15px]" />
       {stat.budget > 0 ? (
         <>
-          {left < 0 ? "已超" : "还能花"} <b className={cn("ex:text-[17px] ex:tabular-nums", left < 0 && "ex:text-danger")}>{yuan(Math.abs(left))}</b>
+          {left < 0 ? t("hero.overShort") : t("hero.canSpend")} <b className={cn("ex:text-[17px] ex:tabular-nums", left < 0 && "ex:text-danger")}>{yuan(Math.abs(left))}</b>
           <span className="ex:flex-1" />
-          <span className="ex:text-ink-3">{left > 0 ? `每天最多 ${yuan(dailyRoom(stat))}` : `今天 ${yuan(today)}`}</span>
+          <span className="ex:text-ink-3">{left > 0 ? t("summary.dailyRoomShort", { amount: yuan(dailyRoom(stat)) }) : t("hero.todayShort", { amount: yuan(today) })}</span>
         </>
       ) : (
         <>
-          本月已花 <b className="ex:text-[17px] ex:tabular-nums">{yuan(stat.total)}</b>
+          {t("home.spentThisMonth")} <b className="ex:text-[17px] ex:tabular-nums">{yuan(stat.total)}</b>
           <span className="ex:flex-1" />
-          <span className="ex:text-ink-3">今天 {yuan(today)}</span>
+          <span className="ex:text-ink-3">{t("hero.todayShort", { amount: yuan(today) })}</span>
         </>
       )}
     </div>
@@ -129,14 +143,15 @@ export function sortCategories(stat: MonthStat): CategoryStat[] {
 }
 
 export function CategoryRow({ c, category, stat, onClick, selected }: { c: CategoryStat; category: Category | undefined; stat: MonthStat; onClick(): void; selected?: boolean }) {
+  const { t } = useI18n(messages);
   const diff = c.average == null ? null : c.spent - c.average;
   const tag =
     c.status === "over" ? (
-      <span className="ex:text-danger">超 {yuan(c.spent - c.budget)}</span>
+      <span className="ex:text-danger">{t("budgets.catOver", { amount: yuan(c.spent - c.budget) })}</span>
     ) : c.status === "fast" ? (
-      <span className="ex:text-warn">偏快</span>
+      <span className="ex:text-warn">{t("budgets.fastTag")}</span>
     ) : diff == null || Math.abs(diff) < 3000 ? (
-      <span className="ex:text-ink-3">{diff == null ? "—" : "持平"}</span>
+      <span className="ex:text-ink-3">{diff == null ? "—" : t("diff.flat")}</span>
     ) : (
       <span className={diff > 0 ? "ex:text-danger" : "ex:text-ok"}>
         {diff > 0 ? "+" : "−"}
@@ -152,11 +167,11 @@ export function CategoryRow({ c, category, stat, onClick, selected }: { c: Categ
       <CatIcon category={category ?? null} />
       <span className="ex:flex ex:min-w-0 ex:flex-1 ex:flex-col ex:gap-1.5">
         <span className="ex:flex ex:items-baseline ex:gap-1 ex:text-[13.5px]">
-          <span className="ex:truncate">{category?.name ?? "已删除分类"}</span>
+          <span className="ex:truncate">{category?.name ?? t("common.deletedCategory")}</span>
           {c.fixedOnly && (
             <small className="ex:text-ink-3 ex:ml-1.5 ex:inline-flex ex:shrink-0 ex:items-center ex:gap-0.5 ex:text-[10.5px]">
               <Repeat className="ex:size-2.5" />
-              固定
+              {t("txList.fixedBadge")}
             </small>
           )}
           <span className="ex:flex-1" />
@@ -166,7 +181,7 @@ export function CategoryRow({ c, category, stat, onClick, selected }: { c: Categ
         {c.budget > 0 ? (
           <Bar className="ex:h-1.5" ratio={c.spent / c.budget} pace={c.fixedOnly || !stat.live ? null : stat.pace} danger={c.status === "over"} />
         ) : (
-          <span className="ex:text-ink-3 ex:text-[10.5px] ex:leading-[6px]">不设预算</span>
+          <span className="ex:text-ink-3 ex:text-[10.5px] ex:leading-[6px]">{t("budgets.noBudget")}</span>
         )}
       </span>
       <span className="ex:w-[54px] ex:shrink-0 ex:text-right ex:text-[11.5px] ex:font-semibold ex:tabular-nums">{tag}</span>
@@ -187,12 +202,13 @@ export function CategoryCard({
   onOpen(id: string): void;
   onOpenAll(): void;
 }) {
+  const { t } = useI18n(messages);
   const list = sortCategories(stat).filter(c => c.spent > 0 || c.budget > 0);
   return (
     <MCard className="ex:pb-1.5">
-      <CardTitle title="分类预算" note={stat.live ? "竖线 = 时间进度" : undefined}>
+      <CardTitle title={t("app.page.categories")} note={stat.live ? t("summary.paceLegend") : undefined}>
         <button type="button" onClick={onOpenAll} className="ex:text-ink-3 ex:-mr-1 ex:flex ex:h-7 ex:items-center ex:gap-0.5 ex:px-1 ex:text-[12px] ex:font-medium">
-          {list.length > limit ? `全部 ${list.length} 类` : <SlidersHorizontal className="ex:size-3.5" />}
+          {list.length > limit ? t("budgets.allCount", { count: list.length }) : <SlidersHorizontal className="ex:size-3.5" />}
           {list.length > limit && <ChevronRight className="ex:size-[13px]" />}
         </button>
       </CardTitle>
@@ -209,7 +225,7 @@ const PAGE_DAYS = 7;
 
 /** 按天分组的流水；days 控制显示到第几天，滚到底时由页面加大 */
 export function TxCard({
-  title = "流水",
+  title,
   note,
   txs,
   categories,
@@ -238,14 +254,15 @@ export function TxCard({
   highlight?: string | null;
   empty?: ReactNode;
 }) {
+  const { t } = useI18n(messages);
   const [opened, setOpened] = useState<string | null>(null);
   const groups = groupByDay(txs);
   const shown = dayLimit != null ? groups.slice(0, dayLimit) : groups;
   return (
     <MCard className="ex:pb-1">
-      <CardTitle title={title} note={note}>
+      <CardTitle title={title ?? t("txList.title")} note={note}>
         {onSearch && (
-          <button type="button" aria-label="搜索流水" onClick={onSearch} className="ex:text-ink-3 ex:-mr-1 ex:grid ex:size-7 ex:place-items-center">
+          <button type="button" aria-label={t("app.page.search")} onClick={onSearch} className="ex:text-ink-3 ex:-mr-1 ex:grid ex:size-7 ex:place-items-center">
             <Search className="ex:size-3.5" />
           </button>
         )}
@@ -253,9 +270,9 @@ export function TxCard({
       {shown.map(([date, list]) => (
         <div key={date}>
           <div className="ex:text-ink-3 ex:flex ex:pt-2 ex:pb-0.5 ex:text-[11.5px] ex:font-semibold">
-            <span>{dayLabel(date, today)}</span>
+            <span>{dayLabel(t, date, today)}</span>
             <span className="ex:flex-1" />
-            <span className="ex:tabular-nums">{yuan(list.filter(t => !isFixed(t)).reduce((s, t) => s + t.cents, 0))}</span>
+            <span className="ex:tabular-nums">{yuan(list.filter(tx => !isFixed(tx)).reduce((s, tx) => s + tx.cents, 0))}</span>
           </div>
           <div className="ex:divide-line-2 ex:divide-y">
             {list.map(tx => (
@@ -272,10 +289,10 @@ export function TxCard({
           </div>
         </div>
       ))}
-      {!shown.length && (empty ?? <p className="ex:text-ink-3 ex:py-5 ex:text-center ex:text-[12.5px]">没有流水</p>)}
+      {!shown.length && (empty ?? <p className="ex:text-ink-3 ex:py-5 ex:text-center ex:text-[12.5px]">{t("hero.emptyDefault")}</p>)}
       {onMore && dayLimit != null && groups.length > dayLimit && (
         <button type="button" onClick={onMore} className="ex:text-ink-3 ex:h-10 ex:w-full ex:text-[12.5px]">
-          再看 {Math.min(moreStep, groups.length - dayLimit)} 天
+          {t("hero.more", { count: Math.min(moreStep, groups.length - dayLimit) })}
         </button>
       )}
     </MCard>
@@ -296,6 +313,7 @@ export function groupByDay(txs: readonly Tx[]): [string, Tx[]][] {
 }
 
 export function TxRow({ tx, category, highlighted, onClick, sub }: { tx: Tx; category: Category | undefined; highlighted?: boolean; onClick(): void; sub?: ReactNode }) {
+  const { t } = useI18n(messages);
   return (
     <button
       type="button"
@@ -307,19 +325,19 @@ export function TxRow({ tx, category, highlighted, onClick, sub }: { tx: Tx; cat
     >
       <CatIcon category={category ?? null} />
       <span className="ex:min-w-0 ex:flex-1">
-        <span className="ex:block ex:truncate ex:text-[14px]">{tx.note || category?.name || "未分类"}</span>
+        <span className="ex:block ex:truncate ex:text-[14px]">{tx.note || category?.name || t("hero.uncategorized")}</span>
         <small className="ex:text-ink-3 ex:flex ex:items-center ex:gap-1 ex:text-[11px]">
           {sub ?? (
             <>
               {isFixed(tx) ? (
                 <>
                   <Repeat className="ex:size-2.5" />
-                  固定支出
+                  {t("hero.fixedExpense")}
                 </>
               ) : (
                 tx.time
               )}
-              {` · ${category?.name ?? "已删除分类"}`}
+              {` · ${category?.name ?? t("common.deletedCategory")}`}
             </>
           )}
         </small>
@@ -346,6 +364,7 @@ export function SwipeRow({
   onDelete: (() => void) | null;
   children: ReactNode;
 }) {
+  const { t } = useI18n(messages);
   const actions = onDelete ? ACTION_W * 2 : ACTION_W;
   const [dx, setDx] = useState<number | null>(null);
   const start = useRef<{ x: number; y: number; base: number; locked?: "x" | "y" } | null>(null);
@@ -393,7 +412,8 @@ export function SwipeRow({
           }}
           className="ex:bg-ink-3 ex:grid ex:w-16 ex:place-content-center ex:justify-items-center ex:gap-0.5 ex:text-[11px] ex:text-white"
         >
-          <Pencil className="ex:size-[17px]" />改
+          <Pencil className="ex:size-[17px]" />
+          {t("hero.swipeEdit")}
         </button>
         {onDelete && (
           <button
@@ -406,7 +426,8 @@ export function SwipeRow({
             className="ex:bg-danger ex:grid ex:w-16 ex:place-content-center ex:justify-items-center ex:gap-0.5 ex:text-[11px] ex:text-white"
             style={offset < -actions ? { width: -offset - ACTION_W } : undefined}
           >
-            <Trash2 className="ex:size-[17px]" />删除
+            <Trash2 className="ex:size-[17px]" />
+            {t("common.delete")}
           </button>
         )}
       </div>

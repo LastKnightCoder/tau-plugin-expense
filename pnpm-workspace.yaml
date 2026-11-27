@@ -5,3 +5,11 @@ minimumReleaseAgeExclude:
   - "@xiongtao.xt/tau-plugins@0.53.0"
   - "@xiongtao.xt/tau-ui@0.6.0"
   - "@xiongtao.xt/tau-plugins@0.62.0"
+
+overrides:
+  '@tau/db-schema': '-'
+  '@tau/markdown': '-'
+  '@tau/shared': '-'
+  '@tau/whiteboard': '-'
+  '@tau/editor': '-'
+  '@tau/asr': '-'

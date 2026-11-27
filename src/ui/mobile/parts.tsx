@@ -3,9 +3,11 @@
  * 触控目标不小于 32px；颜色只用主题 token 与分类数据色。
  */
 import type { ReactNode } from "react";
+import { useI18n } from "@tau/plugins";
 import { Delete } from "lucide-react";
 import { cn } from "@tau/ui";
 import type { Category } from "../../data/model";
+import { messages } from "../../i18n";
 import { categoryColor, iconOf } from "../bits";
 
 export function MCard({ className, children, onClick }: { className?: string; children: ReactNode; onClick?(): void }) {
@@ -154,6 +156,7 @@ export function TextTabs<T extends string>({ value, onChange, options }: { value
 
 /** 面板数字键盘：金额最多两位小数、整数 9 位 */
 export function AmountPad({ value, onChange }: { value: string; onChange(value: string): void }) {
+  const { t } = useI18n(messages);
   const press = (key: string) => {
     if (key === "del") return onChange(value.slice(0, -1));
     if (key === ".") return value.includes(".") ? undefined : onChange(value ? `${value}.` : "0.");
@@ -169,7 +172,7 @@ export function AmountPad({ value, onChange }: { value: string; onChange(value: 
         <button
           key={key}
           type="button"
-          aria-label={key === "del" ? "删除" : key}
+          aria-label={key === "del" ? t("common.delete") : key}
           onClick={() => press(key)}
           className={cn(
             "ex:grid ex:h-[46px] ex:place-items-center ex:rounded-[12px] ex:text-[20px] ex:font-medium ex:active:bg-press",
@@ -196,8 +199,9 @@ export function AmountDisplay({ value, placeholder, caret }: { value: string; pl
 
 /** 分类宫格：编辑面板与语音整理里选分类 */
 export function CategoryGrid({ categories, value, onChange }: { categories: readonly Category[]; value: string; onChange(id: string): void }) {
+  const { t } = useI18n(messages);
   return (
-    <div className="ex:my-3 ex:grid ex:grid-cols-4 ex:gap-1.5" role="radiogroup" aria-label="分类">
+    <div className="ex:my-3 ex:grid ex:grid-cols-4 ex:gap-1.5" role="radiogroup" aria-label={t("common.category")}>
       {categories.map(c => (
         <button
           key={c.id}

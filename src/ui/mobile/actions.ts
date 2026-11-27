@@ -4,6 +4,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "@tau/ui";
 import type { Tx, TxInput } from "../../data/model";
+import type { Translate } from "../../i18n";
 import { EXPENSE_KEY, type ExpenseRuntime } from "../../runtime";
 
 export interface NewTx extends Omit<TxInput, "recurringId"> {
@@ -11,10 +12,10 @@ export interface NewTx extends Omit<TxInput, "recurringId"> {
   remember?: boolean;
 }
 
-/** 中途写入失败时抛出，saved 为已经记下的几笔（调用方据此去掉，避免重试时重复记） */
+/** 中途写入失败时抛出，saved 为已经记下的几笔（调用方据此去掉，避免重试时重复记）；文案由展示层按 saved 翻译 */
 export class PartialAddError extends Error {
   constructor(readonly saved: number) {
-    super(`已记下 ${saved} 笔，其余记录失败`);
+    super(`PARTIAL_ADD:${saved}`);
   }
 }
 
@@ -37,22 +38,22 @@ export async function addTxs(runtime: Pick<ExpenseRuntime, "data">, client: Quer
   }
 }
 
-export async function removeWithUndo(runtime: Pick<ExpenseRuntime, "data">, client: QueryClient, tx: Tx) {
+export async function removeWithUndo(runtime: Pick<ExpenseRuntime, "data">, client: QueryClient, tx: Tx, t: Translate) {
   try {
     await runtime.data.deleteTx(tx);
     await client.invalidateQueries({ queryKey: EXPENSE_KEY });
     const { id: _id, revision: _revision, ...input } = tx;
-    toast.success(`已删除「${tx.note || "这一笔"}」`, {
+    toast.success(t("actions.deleted", { name: tx.note || t("actions.thisTx") }), {
       action: {
-        label: "撤销",
+        label: t("common.undo"),
         onClick: () =>
           void runtime.data
             .addTx(input)
             .then(() => client.invalidateQueries({ queryKey: EXPENSE_KEY }))
-            .catch(() => toast.error("撤销失败")),
+            .catch(() => toast.error(t("common.undoFailed"))),
       },
     });
   } catch {
-    toast.error("删除失败");
+    toast.error(t("common.deleteFailed"));
   }
 }

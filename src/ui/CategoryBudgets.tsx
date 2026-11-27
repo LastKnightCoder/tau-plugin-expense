@@ -3,12 +3,14 @@
  * 点一行筛选日历与流水，再点取消；选中时其他行变淡。
  */
 import { AlertTriangle } from "lucide-react";
+import { useI18n } from "@tau/plugins";
 import { cn } from "@tau/ui";
 import { formatYuan, type Category } from "../data/model";
 import type { CategoryStat, MonthStat } from "../data/stats";
+import { messages } from "../i18n";
 import { CategoryIcon, Diff, Meter, categoryColor, yuan } from "./bits";
 
-const STATUS = { over: "超", fast: "快" } as const;
+const STATUS_KEYS = { over: "budgets.statusOver", fast: "budgets.statusFast" } as const;
 
 export function CategoryBudgets({
   stat,
@@ -21,19 +23,20 @@ export function CategoryBudgets({
   selected: string | null;
   onPick(id: string): void;
 }) {
+  const { t } = useI18n(messages);
   const known = new Map(categories.map(c => [c.id, c]));
   // 已删除分类的历史流水挂到「其他」的样子显示
   const rows = stat.categories
-    .map(s => ({ stat: s, cat: known.get(s.id) ?? { id: s.id, name: "已删除分类", icon: "other", budget: 0, color: 6 } }))
+    .map(s => ({ stat: s, cat: known.get(s.id) ?? { id: s.id, name: t("common.deletedCategory"), icon: "other", budget: 0, color: 6 } }))
     .filter(r => known.has(r.stat.id) || r.stat.spent > 0);
   const hasHistory = stat.categories.some(c => c.average != null);
   return (
     <div className="ex:px-3 ex:pt-1.5 ex:pb-3">
       <div className="ex:text-ink-3 ex:grid ex:h-[22px] ex:grid-cols-[104px_minmax(0,1fr)_128px_84px] ex:items-center ex:gap-3.5 ex:px-2 ex:text-[11px]">
-        <span>分类</span>
-        <span>已用 / 预算</span>
-        <span className="ex:text-right">金额</span>
-        <span className="ex:text-right">{hasHistory ? "比前 3 月平均" : ""}</span>
+        <span>{t("common.category")}</span>
+        <span>{t("budgets.used")}</span>
+        <span className="ex:text-right">{t("budgets.amount")}</span>
+        <span className="ex:text-right">{hasHistory ? t("budgets.vsAvg") : ""}</span>
       </div>
       {rows.map(({ stat: s, cat }) => (
         <Row key={s.id} s={s} cat={cat} live={stat.live} pace={stat.pace} selected={selected} onPick={onPick} />
@@ -57,6 +60,7 @@ function Row({
   selected: string | null;
   onPick(id: string): void;
 }) {
+  const { t } = useI18n(messages);
   const on = selected === s.id;
   const color = categoryColor(cat.color);
   return (
@@ -77,14 +81,14 @@ function Row({
         {s.status !== "ok" && (
           <span className={cn("ex:inline-flex ex:shrink-0 ex:items-center ex:gap-0.5 ex:text-[10.5px]", s.status === "over" ? "ex:text-danger" : "ex:text-warn")}>
             <AlertTriangle className="ex:size-[11px]" strokeWidth={2} />
-            {STATUS[s.status]}
+            {t(STATUS_KEYS[s.status])}
           </span>
         )}
       </span>
       {cat.budget > 0 ? (
         <Meter ratio={s.spent / cat.budget} pace={live && !s.fixedOnly ? pace : null} color={color} />
       ) : (
-        <span className="ex:text-ink-3 ex:text-[11.5px]">未设预算</span>
+        <span className="ex:text-ink-3 ex:text-[11.5px]">{t("budgets.noBudget")}</span>
       )}
       <span className="ex:text-right ex:text-[12.5px] ex:tabular-nums">
         <b className="ex:font-semibold">{yuan(s.spent)}</b>

@@ -4,10 +4,12 @@
  */
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useI18n } from "@tau/plugins";
 import { ChevronRight, Repeat, Trash2 } from "lucide-react";
 import { toast } from "@tau/ui";
 import { formatYuan, parseYuan, type Category, type Tx } from "../../data/model";
 import { EXPENSE_KEY, useRuntime } from "../../runtime";
+import { messages } from "../../i18n";
 import { dayLabel, yuan } from "../bits";
 import { removeWithUndo } from "./actions";
 import { AmountDisplay, AmountPad, CategoryGrid, PrimaryButton } from "./parts";
@@ -30,6 +32,7 @@ export function TxSheet({
   onClose(): void;
 }) {
   const runtime = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
@@ -68,7 +71,7 @@ export function TxSheet({
       await client.invalidateQueries({ queryKey: EXPENSE_KEY });
       onClose();
     } catch {
-      toast.error("保存失败，可能在别处被改过，刷新后再试");
+      toast.error(t("txDialog.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -80,20 +83,20 @@ export function TxSheet({
     <Sheet
       open={tx != null}
       onClose={onClose}
-      title="改一笔"
+      title={t("txSheet.title")}
       subtitle={padding ? [note.trim(), cat?.name].filter(Boolean).join(" · ") : undefined}
       trailing={
         padding ? (
           <button type="button" onClick={() => setPadding(false)} className="ex:text-accent-text ex:h-8 ex:px-1 ex:text-[13.5px] ex:font-semibold">
-            完成
+            {t("common.done")}
           </button>
         ) : tx && !fixed ? (
           <button
             type="button"
-            aria-label="删除这一笔"
+            aria-label={t("txSheet.deleteAria")}
             onClick={() => {
               onClose();
-              void removeWithUndo(runtime, client, tx);
+              void removeWithUndo(runtime, client, tx, t);
             }}
             className="ex:text-danger ex:grid ex:size-8 ex:place-items-center"
           >
@@ -102,18 +105,18 @@ export function TxSheet({
         ) : null
       }
     >
-      <button type="button" className="ex:block ex:w-full" onClick={() => setPadding(true)} aria-label="改金额">
+      <button type="button" className="ex:block ex:w-full" onClick={() => setPadding(true)} aria-label={t("txSheet.editAmountAria")}>
         <AmountDisplay value={amount} caret={padding} />
       </button>
       {padding ? (
         <>
           <p className="ex:text-ink-3 ex:mb-3 ex:text-center ex:text-[12px]">
-            原来 {tx ? yuan(tx.cents) : ""}
+            {t("txSheet.original", { amount: tx ? yuan(tx.cents) : "" })}
             {left != null && cat && (
               <>
                 {" "}
                 · {cat.name}
-                {left < 0 ? `会超 ${yuan(-left)}` : `还剩 ${yuan(left)}`}
+                {left < 0 ? t("txSheet.willOver", { amount: yuan(-left) }) : t("txSheet.willLeft", { amount: yuan(left) })}
               </>
             )}
           </p>
@@ -124,32 +127,32 @@ export function TxSheet({
           <CategoryGrid categories={categories} value={category} onChange={setCategory} />
           <div className="ex:divide-line-2 ex:divide-y">
             <label className={FIELD}>
-              <span className="ex:text-ink-3 ex:w-11 ex:shrink-0">备注</span>
+              <span className="ex:text-ink-3 ex:w-11 ex:shrink-0">{t("txDialog.note")}</span>
               <input
                 value={note}
                 onChange={e => setNote(e.target.value.slice(0, 200))}
-                placeholder="可不填"
+                placeholder={t("txSheet.notePh")}
                 className="ex:placeholder:text-ink-3 ex:min-w-0 ex:flex-1 ex:bg-transparent ex:outline-none"
               />
             </label>
             <label className={FIELD}>
-              <span className="ex:text-ink-3 ex:w-11 ex:shrink-0">日期</span>
+              <span className="ex:text-ink-3 ex:w-11 ex:shrink-0">{t("txDialog.date")}</span>
               <span className="ex:relative ex:flex ex:flex-1 ex:items-center ex:gap-1">
-                {date ? dayLabel(date, today) : ""}
+                {date ? dayLabel(t, date, today) : ""}
                 <ChevronRight className="ex:text-ink-3 ex:ml-auto ex:size-4" />
                 <input
                   type="date"
                   value={date}
                   max={today}
                   onChange={e => e.target.value && setDate(e.target.value)}
-                  aria-label="日期"
+                  aria-label={t("txDialog.date")}
                   className="ex:absolute ex:inset-0 ex:opacity-0"
                 />
               </span>
             </label>
             {!fixed && (
               <label className={FIELD}>
-                <span className="ex:text-ink-3 ex:w-11 ex:shrink-0">时间</span>
+                <span className="ex:text-ink-3 ex:w-11 ex:shrink-0">{t("txSheet.time")}</span>
                 <input type="time" value={time} onChange={e => setTime(e.target.value)} className="ex:min-w-0 ex:flex-1 ex:bg-transparent ex:outline-none" />
               </label>
             )}
@@ -158,16 +161,16 @@ export function TxSheet({
             {fixed ? (
               <>
                 <Repeat className="ex:size-3" />
-                这是自动记入的固定支出，停掉要去设置里删除规则
+                {t("txSheet.fixedHint")}
               </>
             ) : tx && category !== tx.category && note.trim() ? (
-              `以后写「${note.trim()}」会自动归到${cat?.name ?? "这一类"}`
+              t("txSheet.aliasHint", { note: note.trim(), cat: cat?.name ?? t("txSheet.thisCat") })
             ) : null}
           </p>
         </>
       )}
       <PrimaryButton className="ex:mt-2" disabled={!valid || saving} onClick={() => void save()}>
-        保存
+        {t("common.save")}
       </PrimaryButton>
     </Sheet>
   );

@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSettingsDraft, type PluginSettingsProps } from "@tau/plugins";
+import { useI18n, useSettingsDraft, type PluginSettingsProps } from "@tau/plugins";
 import { Plus, Trash2 } from "lucide-react";
 import { Button, IconButton, Input, Loading, Popover, Select, cn, toast } from "@tau/ui";
 import {
@@ -22,6 +22,7 @@ import {
 import { baseline } from "../data/stats";
 import { configChanges } from "../data/changes";
 import { EXPENSE_KEY, useRuntime } from "../runtime";
+import { messages } from "../i18n";
 import { CategoryIcon, ICONS, yuan } from "./bits";
 import { useConfig, useLedger, useNow } from "./queries";
 
@@ -44,6 +45,7 @@ const newId = (prefix: string) => `${prefix}${Date.now().toString(36)}${Math.ran
 
 export function SettingsForm(_: PluginSettingsProps) {
   const { data, context } = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const config = useConfig();
   const { today } = useNow();
@@ -65,9 +67,9 @@ export function SettingsForm(_: PluginSettingsProps) {
   // 预算填 0 和留空一样表示不设
   const budgetOf = (text: string) => (/^0*(\.0*)?$/.test(text.trim()) ? 0 : parseYuan(text));
   const list = cats ?? [];
-  const catErrors = list.map(c => (!c.name.trim() ? "填名称" : budgetOf(c.budget) == null ? "金额不对" : null));
+  const catErrors = list.map(c => (!c.name.trim() ? t("settings.errName") : budgetOf(c.budget) == null ? t("settings.errAmount") : null));
   const recErrors = recs.map(r =>
-    !r.note.trim() ? "填名称" : parseYuan(r.cents) == null ? "金额不对" : !(Number(r.day) >= 1 && Number(r.day) <= 28 && Number.isInteger(Number(r.day))) ? "填 1–28" : null
+    !r.note.trim() ? t("settings.errName") : parseYuan(r.cents) == null ? t("settings.errAmount") : !(Number(r.day) >= 1 && Number(r.day) <= 28 && Number.isInteger(Number(r.day))) ? t("settings.errDay") : null
   );
   const errorCount = [...catErrors, ...recErrors].filter(e => e != null).length;
   const valid = errorCount === 0;
@@ -76,7 +78,7 @@ export function SettingsForm(_: PluginSettingsProps) {
     categories: list.map(c => ({ id: c.id, name: c.name.trim(), icon: c.icon, color: c.color, budget: budgetOf(c.budget) ?? 0 })),
     recurring: recs.map(r => ({ id: r.id, note: r.note.trim(), cents: parseYuan(r.cents) ?? 0, category: r.category, day: Number(r.day) || 0 })),
   });
-  const changes = cats && config.data ? configChanges(config.data, toConfig()) : [];
+  const changes = cats && config.data ? configChanges(config.data, toConfig(), t) : [];
 
   const save = async () => {
     const next = toConfig();
@@ -86,7 +88,7 @@ export function SettingsForm(_: PluginSettingsProps) {
     if (context.signal.aborted) return;
     await client.invalidateQueries({ queryKey: EXPENSE_KEY });
     reset(next);
-    return moved ? `已保存，${moved} 笔流水移到了「其他」` : undefined;
+    return moved ? t("settings.savedToast", { count: moved }) : undefined;
   };
   const draft = useSettingsDraft({
     dirty: changes.length > 0 || removed.length > 0,
@@ -120,42 +122,42 @@ export function SettingsForm(_: PluginSettingsProps) {
     setSaving(true);
     try {
       const text = await save();
-      toast.success(text ?? "已保存");
+      toast.success(text ?? t("common.saved"));
     } catch {
-      toast.error("保存失败");
+      toast.error(t("common.saveFailed"));
     } finally {
       setSaving(false);
     }
   };
 
-  const catOptions = cats.map(c => ({ value: c.id, label: c.name || "未命名" }));
+  const catOptions = cats.map(c => ({ value: c.id, label: c.name || t("settings.unnamed") }));
 
   return (
     <div className="ex:flex ex:flex-col ex:gap-5 ex:px-3 ex:py-2">
       <section className="ex:flex ex:flex-col ex:gap-1.5">
         <div className="ex:flex ex:items-center ex:gap-2">
-          <h3 className="ex:text-[13px] ex:font-semibold">分类与月预算</h3>
-          <span className="ex:text-ink-3 ex:text-[12px]">合计 {yuan(total)} / 月 · 留空表示不设</span>
+          <h3 className="ex:text-[13px] ex:font-semibold">{t("settings.catTitle")}</h3>
+          <span className="ex:text-ink-3 ex:text-[12px]">{t("settings.totalPerMonth", { amount: yuan(total) })}</span>
           <span className="ex:flex-1" />
           {base.length > 0 && (
             <Button size="sm" variant="ghost" onClick={fillFromHistory}>
-              按前 {base.length} 个月平均填入
+              {t("settings.fillAvg", { count: base.length })}
             </Button>
           )}
         </div>
         {cats.map((c, i) => (
           <div key={c.id} className="ex:grid ex:grid-cols-[28px_minmax(0,1fr)_120px_28px] ex:items-start ex:gap-2">
             <IconPicker category={c} onPick={icon => setCat(i, { icon })} />
-            <Input size="sm" value={c.name} maxLength={12} onChange={e => setCat(i, { name: e.target.value })} aria-label="分类名称" aria-invalid={!c.name.trim()} />
+            <Input size="sm" value={c.name} maxLength={12} onChange={e => setCat(i, { name: e.target.value })} aria-label={t("settings.nameAria")} aria-invalid={!c.name.trim()} />
             <div className="ex:flex ex:flex-col ex:gap-0.5">
               <Input
                 size="sm"
                 inputMode="decimal"
                 value={c.budget}
-                placeholder="不设"
+                placeholder={t("settings.noBudgetPh")}
                 onChange={e => setCat(i, { budget: e.target.value.replace(/[^\d.]/g, "") })}
-                aria-label={`${c.name}的月预算（元）`}
-                aria-invalid={catErrors[i] === "金额不对"}
+                aria-label={t("settings.budgetAria", { name: c.name })}
+                aria-invalid={catErrors[i] === t("settings.errAmount")}
                 className="ex:text-right ex:tabular-nums"
               />
               {catErrors[i] && <span className="ex:text-danger ex:text-[11px]">{catErrors[i]}</span>}
@@ -164,7 +166,7 @@ export function SettingsForm(_: PluginSettingsProps) {
               <span />
             ) : (
               <IconButton
-                aria-label={`删除 ${c.name}`}
+                aria-label={t("txList.deleteAria", { name: c.name })}
                 onClick={() => {
                   setCats(cats.filter((_, k) => k !== i));
                   setRecs(recs.map(r => (r.category === c.id ? { ...r, category: OTHER } : r)));
@@ -184,37 +186,37 @@ export function SettingsForm(_: PluginSettingsProps) {
             className="ex:self-start"
             onClick={() => setCats(insertBeforeOther(cats, { id: newId("c"), name: "", icon: "tag", budget: "", color: nextColor(cats) }))}
           >
-            新增分类
+            {t("settings.addCat")}
           </Button>
         )}
-        {removed.length > 0 && <p className="ex:text-ink-3 ex:text-[12px]">删除的分类里的流水，保存后会移到「其他」。</p>}
+        {removed.length > 0 && <p className="ex:text-ink-3 ex:text-[12px]">{t("settings.removedNote")}</p>}
       </section>
 
       <section className="ex:flex ex:flex-col ex:gap-1.5">
         <div className="ex:flex ex:items-center ex:gap-2">
-          <h3 className="ex:text-[13px] ex:font-semibold">固定支出</h3>
-          <span className="ex:text-ink-3 ex:text-[12px]">房租、话费、会员这类每月不变的，到日子自动记一笔，不计入日历和日均</span>
+          <h3 className="ex:text-[13px] ex:font-semibold">{t("settings.recTitle")}</h3>
+          <span className="ex:text-ink-3 ex:text-[12px]">{t("settings.recHint")}</span>
         </div>
         {recs.map((r, i) => (
           <div key={r.id} className="ex:grid ex:grid-cols-[minmax(0,1fr)_120px_100px_92px_28px] ex:items-start ex:gap-2">
-            <Input size="sm" value={r.note} maxLength={40} placeholder="房租" onChange={e => setRec(i, { note: e.target.value })} aria-label="名称" aria-invalid={recErrors[i] === "填名称"} />
-            <Select size="sm" aria-label="分类" value={r.category} onValueChange={v => setRec(i, { category: v })} options={catOptions} />
+            <Input size="sm" value={r.note} maxLength={40} placeholder={t("settings.namePh")} onChange={e => setRec(i, { note: e.target.value })} aria-label={t("settings.nameField")} aria-invalid={recErrors[i] === t("settings.errName")} />
+            <Select size="sm" aria-label={t("common.category")} value={r.category} onValueChange={v => setRec(i, { category: v })} options={catOptions} />
             <Input
               size="sm"
               inputMode="decimal"
               value={r.cents}
-              placeholder="金额"
+              placeholder={t("settings.amountPh")}
               onChange={e => setRec(i, { cents: e.target.value.replace(/[^\d.]/g, "") })}
-              aria-label="金额（元）"
-              aria-invalid={recErrors[i] === "金额不对"}
+              aria-label={t("settings.amountAria")}
+              aria-invalid={recErrors[i] === t("settings.errAmount")}
               className="ex:text-right ex:tabular-nums"
             />
             <div className="ex:flex ex:items-center ex:gap-1">
-              <span className="ex:text-ink-3 ex:text-[12px]">每月</span>
-              <Input size="sm" inputMode="numeric" value={r.day} onChange={e => setRec(i, { day: e.target.value.replace(/[^\d]/g, "").slice(0, 2) })} aria-label="每月几号" aria-invalid={recErrors[i] === "填 1–28"} className="ex:text-right ex:tabular-nums" wrapperClassName="ex:w-11" />
-              <span className="ex:text-ink-3 ex:text-[12px]">号</span>
+              <span className="ex:text-ink-3 ex:text-[12px]">{t("settings.monthlyPrefix")}</span>
+              <Input size="sm" inputMode="numeric" value={r.day} onChange={e => setRec(i, { day: e.target.value.replace(/[^\d]/g, "").slice(0, 2) })} aria-label={t("settings.dayAria")} aria-invalid={recErrors[i] === t("settings.errDay")} className="ex:text-right ex:tabular-nums" wrapperClassName="ex:w-11" />
+              <span className="ex:text-ink-3 ex:text-[12px]">{t("settings.monthlySuffix")}</span>
             </div>
-            <IconButton aria-label={`删除 ${r.note || "这条固定支出"}`} onClick={() => setRecs(recs.filter((_, k) => k !== i))}>
+            <IconButton aria-label={t("settings.deleteRecAria", { name: r.note || t("settings.thisRule") })} onClick={() => setRecs(recs.filter((_, k) => k !== i))}>
               <Trash2 className="ex:size-[14px]" strokeWidth={1.75} />
             </IconButton>
             {recErrors[i] && <span className="ex:text-danger ex:col-span-5 ex:text-[11px]">{recErrors[i]}</span>}
@@ -227,18 +229,18 @@ export function SettingsForm(_: PluginSettingsProps) {
           className="ex:self-start"
           onClick={() => setRecs([...recs, { id: newId("r"), note: "", cents: "", category: cats.find(c => c.id === "home")?.id ?? OTHER, day: "1" }])}
         >
-          新增固定支出
+          {t("settings.addRec")}
         </Button>
-        <p className="ex:text-ink-3 ex:text-[12px]">新加的固定支出从本月开始记，不会补记以前的月份；删掉后已记的流水保留。</p>
+        <p className="ex:text-ink-3 ex:text-[12px]">{t("settings.recNote")}</p>
       </section>
 
       {!draft && (
         <div className="ex:flex ex:justify-end ex:gap-2">
           <Button variant="secondary" disabled={saving} onClick={() => config.data && reset(config.data)}>
-            还原
+            {t("common.reset")}
           </Button>
           <Button disabled={!valid} loading={saving} onClick={() => void saveHere()}>
-            保存
+            {t("common.save")}
           </Button>
         </div>
       )}
@@ -248,13 +250,14 @@ export function SettingsForm(_: PluginSettingsProps) {
 
 
 function IconPicker({ category, onPick }: { category: Pick<Category, "icon" | "color" | "name">; onPick(icon: string): void }) {
+  const { t } = useI18n(messages);
   const [open, setOpen] = useState(false);
   return (
     <Popover
       open={open}
       onOpenChange={setOpen}
       trigger={
-        <button type="button" aria-label={`${category.name || "分类"}的图标`} className="ex:hover:bg-hover ex:grid ex:size-7 ex:place-items-center ex:rounded-[8px]">
+        <button type="button" aria-label={t("settings.iconAria", { name: category.name || t("common.category") })} className="ex:hover:bg-hover ex:grid ex:size-7 ex:place-items-center ex:rounded-[8px]">
           <CategoryIcon category={category} />
         </button>
       }

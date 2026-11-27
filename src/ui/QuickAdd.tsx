@@ -7,11 +7,13 @@ import { useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { SendHorizontal, Sparkles } from "lucide-react";
 import { Button, IconButton, Spinner, cn, toast } from "@tau/ui";
-import { aiErrorMessage, needsSetup } from "../ai";
+import { useI18n } from "@tau/plugins";
+import { aiErrorKey, needsSetup } from "../ai";
 import { addDays, dateKey, formatYuan, timeKey, type Config } from "../data/model";
 import { parseLine } from "../data/parse";
 import type { MonthStat } from "../data/stats";
 import { EXPENSE_KEY, useRuntime } from "../runtime";
+import { messages, type MessageKey } from "../i18n";
 import { CategoryIcon, categoryColor, yuan } from "./bits";
 import { useAliases } from "./queries";
 
@@ -28,13 +30,14 @@ export function QuickAdd({
   examples?: readonly string[];
 }) {
   const { data, ai, context } = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const aliases = useAliases();
   const [text, setText] = useState("");
   // 手动选的分类只对选它时的那句备注有效，备注改了就回到自动识别
   const [pick, setPick] = useState<{ note: string; category: string } | null>(null);
   const [classifying, setClassifying] = useState(false);
-  const [error, setError] = useState<{ message: string; setup: boolean } | null>(null);
+  const [error, setError] = useState<{ key: MessageKey; setup: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef<AbortController | null>(null);
@@ -66,8 +69,8 @@ export function QuickAdd({
       if (!controller.signal.aborted && !context.signal.aborted) setPick({ note: draft.note, category: id });
     } catch (err) {
       if (controller.signal.aborted) return;
-      const message = aiErrorMessage(err);
-      if (message) setError({ message, setup: needsSetup(err) });
+      const key = aiErrorKey(err);
+      if (key) setError({ key, setup: needsSetup(err) });
     } finally {
       if (!controller.signal.aborted) setClassifying(false);
     }
@@ -82,13 +85,13 @@ export function QuickAdd({
       // 手动选过（含 AI 归类）才记住，关键词识别的不占记忆；记不住不影响这笔已经记下
       if (draft.note && picked != null) await data.rememberAlias(draft.note, cat.id).catch(() => undefined);
       if (context.signal.aborted) return;
-      toast.success(`已记下 ${draft.note || cat.name} ${yuan(draft.cents!)}`);
+      toast.success(t("quick.saved", { name: draft.note || cat.name, amount: yuan(draft.cents!) }));
       setText("");
       setPick(null);
       await client.invalidateQueries({ queryKey: EXPENSE_KEY });
       inputRef.current?.focus();
     } catch {
-      toast.error("记录失败");
+      toast.error(t("common.logFailed"));
     } finally {
       setSaving(false);
     }
@@ -117,11 +120,11 @@ export function QuickAdd({
               change("");
             }
           }}
-          placeholder="写一句：午饭 牛肉面 28"
-          aria-label="一句话记一笔支出"
+          placeholder={t("quick.placeholder")}
+          aria-label={t("quick.aria")}
           className="ex:text-tau-body ex:placeholder:text-ink-3 ex:min-w-0 ex:flex-1 ex:bg-transparent ex:outline-none"
         />
-        <IconButton aria-label="记下" disabled={!valid || saving} onClick={() => void submit()}>
+        <IconButton aria-label={t("quick.submitAria")} disabled={!valid || saving} onClick={() => void submit()}>
           {saving ? <Spinner /> : <SendHorizontal className="ex:size-[15px]" strokeWidth={1.75} />}
         </IconButton>
       </div>
@@ -131,16 +134,20 @@ export function QuickAdd({
           <div className="ex:flex ex:items-center ex:gap-2">
             {cat ? <CategoryIcon category={cat} size="sm" /> : <span className="ex:size-[18px] ex:rounded-full ex:shadow-[inset_0_0_0_1px_var(--tau-line-1)]" />}
             <span className="ex:min-w-0 ex:flex-1 ex:truncate">
-              {draft.dayOffset !== 0 && <span className="ex:text-ink-3">{draft.dayOffset === -1 ? "昨天 · " : "前天 · "}</span>}
-              {draft.note || <span className="ex:text-ink-3">无备注</span>}
+              {draft.dayOffset !== 0 && (
+                <span className="ex:text-ink-3">
+                  {t("quick.dayPrefix", { day: draft.dayOffset === -1 ? t("date.yesterday") : t("date.dayBefore") })}
+                </span>
+              )}
+              {draft.note || <span className="ex:text-ink-3">{t("quick.noNote")}</span>}
             </span>
             {draft.cents == null ? (
-              <span className="ex:text-warn ex:text-[12px]">缺金额</span>
+              <span className="ex:text-warn ex:text-[12px]">{t("quick.missingAmount")}</span>
             ) : (
               <b className="ex:font-semibold ex:tabular-nums">−{formatYuan(draft.cents)}</b>
             )}
           </div>
-          <div className="ex:flex ex:flex-wrap ex:gap-1" role="radiogroup" aria-label="分类">
+          <div className="ex:flex ex:flex-wrap ex:gap-1" role="radiogroup" aria-label={t("common.category")}>
             {config.categories.map(c => {
               const on = c.id === category;
               return (
@@ -165,19 +172,19 @@ export function QuickAdd({
           </div>
           {error ? (
             <div className="ex:text-ink-2 ex:flex ex:items-center ex:gap-2 ex:text-[12px]">
-              {error.message}，点一下分类就行
+              {t("quick.errorHint", { message: t(error.key) })}
               {error.setup && (
                 <Button size="sm" variant="ghost" onClick={() => context.ai.openSettings()}>
-                  去设置
+                  {t("common.goSettings")}
                 </Button>
               )}
             </div>
           ) : !cat ? (
             <div className="ex:text-ink-3 ex:flex ex:items-center ex:gap-2 ex:text-[12px]">
-              没认出分类，点一下；记过一次后同样的写法会自动归类
+              {t("quick.unknownCat")}
               {draft.note && (
                 <Button size="sm" variant="ghost" icon={classifying ? undefined : Sparkles} loading={classifying} onClick={() => void classify()}>
-                  AI 归类
+                  {t("quick.aiClassify")}
                 </Button>
               )}
             </div>
@@ -185,17 +192,14 @@ export function QuickAdd({
             catAfter != null &&
             sameMonth && (
               <div className="ex:text-ink-2 ex:text-[12px]">
-                记下后：{cat.name}本月{" "}
-                <b className={cn("ex:font-semibold ex:tabular-nums", cat.budget > 0 && catAfter > cat.budget ? "ex:text-danger" : "ex:text-ink-1")}>
-                  {yuan(catAfter)}
-                </b>
+                {t("quick.afterPrefix")}
+                {t("quick.catSpent", { name: cat.name, amount: yuan(catAfter) })}
                 {cat.budget > 0 && <span className="ex:tabular-nums"> / {formatYuan(cat.budget)}</span>}
-                {cat.budget > 0 && catAfter > cat.budget && <span className="ex:text-danger">，已超</span>}
+                {cat.budget > 0 && catAfter > cat.budget && <span className="ex:text-danger">{t("quick.overSuffix")}</span>}
                 {stat.budget > 0 && left != null && (
                   <>
                     {" "}
-                    · 本月{left < 0 ? "超出" : "还剩"}{" "}
-                    <b className={cn("ex:font-semibold ex:tabular-nums", left < 0 ? "ex:text-danger" : "ex:text-ink-1")}>{yuan(Math.abs(left))}</b>
+                    {left < 0 ? t("quick.monthOver", { amount: yuan(Math.abs(left)) }) : t("quick.monthLeft", { amount: yuan(Math.abs(left)) })}
                   </>
                 )}
               </div>

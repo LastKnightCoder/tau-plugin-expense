@@ -4,9 +4,11 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw, Sparkles } from "lucide-react";
+import { useI18n } from "@tau/plugins";
 import { Button, IconButton, Segmented, cn } from "@tau/ui";
-import { aiErrorMessage, needsSetup, type AIScope, type AnalysisInput } from "../ai";
+import { aiErrorKey, needsSetup, type AIScope, type AnalysisInput } from "../ai";
 import { useRuntime } from "../runtime";
+import { messages, type MessageKey } from "../i18n";
 import { Card } from "./bits";
 
 interface Result {
@@ -18,9 +20,10 @@ interface Result {
 
 export function AIPanel({ input, stamp, className }: { input: AnalysisInput; stamp: string; className?: string }) {
   const { ai, context } = useRuntime();
+  const { t } = useI18n(messages);
   const [scope, setScope] = useState<AIScope>("tip");
   const [results, setResults] = useState<Partial<Record<AIScope, Result>>>({});
-  const [error, setError] = useState<{ scope: AIScope; message: string; setup: boolean } | null>(null);
+  const [error, setError] = useState<{ scope: AIScope; key: MessageKey; setup: boolean } | null>(null);
   const [running, setRunning] = useState<AIScope | null>(null);
   const [contentHeight, setContentHeight] = useState(72);
   const content = useRef<HTMLDivElement>(null);
@@ -48,13 +51,13 @@ export function AIPanel({ input, stamp, className }: { input: AnalysisInput; sta
       setResults(r => ({ ...r, [target]: { text, stamp, done: true } }));
     } catch (err) {
       if (current.signal.aborted) return;
-      const message = aiErrorMessage(err);
+      const key = aiErrorKey(err);
       setResults(r => {
         const next = { ...r };
         delete next[target];
         return next;
       });
-      if (message) setError({ scope: target, message, setup: needsSetup(err) });
+      if (key) setError({ scope: target, key, setup: needsSetup(err) });
     } finally {
       if (controller.current === current) {
         controller.current = null;
@@ -80,16 +83,16 @@ export function AIPanel({ input, stamp, className }: { input: AnalysisInput; sta
         </span>
         <b className="ex:text-[13px] ex:font-semibold">AI</b>
         <span className="ex:flex-1" />
-        <Segmented<AIScope> label="分析范围" size="sm" value={scope} onValueChange={next => {
+        <Segmented<AIScope> label={t("ai.scopeLabel")} size="sm" value={scope} onValueChange={next => {
           if (next === scope) return;
           setScope(next);
           setContentHeight(72);
         }}>
-          <Segmented.Item value="tip" label="提醒" />
-          <Segmented.Item value="review" label="月度复盘" />
+          <Segmented.Item value="tip" label={t("ai.tip")} />
+          <Segmented.Item value="review" label={t("ai.review")} />
         </Segmented>
         {result?.done && (
-          <IconButton aria-label="重新分析" disabled={running !== null} onClick={() => void run(scope)} className="ex:size-[26px]">
+          <IconButton aria-label={t("ai.rerun")} disabled={running !== null} onClick={() => void run(scope)} className="ex:size-[26px]">
             <RefreshCw className="ex:size-[14px]" strokeWidth={1.75} />
           </IconButton>
         )}
@@ -105,12 +108,12 @@ export function AIPanel({ input, stamp, className }: { input: AnalysisInput; sta
         ) : (
           <p className="ex:text-ink-2">
             {streaming
-              ? "正在分析，请稍候…"
+              ? t("ai.analyzing")
               : visibleError
-                ? visibleError.message
+                ? t(visibleError.key)
                 : scope === "tip"
-                  ? "看看剩下几天每天最多花多少，哪个分类需要收着点。"
-                  : "复盘这个月比平时多花或少花在哪，给出能省多少的建议。"}
+                  ? t("ai.tipHint")
+                  : t("ai.reviewHint")}
           </p>
         )}
         {!result?.done && (
@@ -122,7 +125,7 @@ export function AIPanel({ input, stamp, className }: { input: AnalysisInput; sta
             icon={Sparkles}
             onClick={() => visibleError?.setup ? void context.ai.openSettings() : void run(scope)}
           >
-            {streaming ? "分析中…" : visibleError?.setup ? "去分配模型" : visibleError ? "重试" : "分析"}
+            {streaming ? t("ai.running") : visibleError?.setup ? t("ai.goAssign") : visibleError ? t("ai.retry") : t("ai.analyze")}
           </Button>
         )}
         {stale && (
@@ -132,12 +135,12 @@ export function AIPanel({ input, stamp, className }: { input: AnalysisInput; sta
             disabled={running !== null}
             className="ex:text-accent-text ex:mt-1.5 ex:text-[11.5px] ex:hover:underline"
           >
-            记录有变化，重新分析
+            {t("ai.stale")}
           </button>
         )}
       </div>
       <p className="ex:text-ink-3 ex:relative ex:mt-auto ex:text-[11px]">
-        AI 只读取分类金额和备注文字，使用「对话功能」的模型
+        {t("ai.footnote")}
       </p>
     </Card>
   );

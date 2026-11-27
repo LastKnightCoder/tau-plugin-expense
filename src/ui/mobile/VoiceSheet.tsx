@@ -6,12 +6,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Info, Sparkles, X } from "lucide-react";
+import { useI18n } from "@tau/plugins";
 import { cn, toast } from "@tau/ui";
-import { aiErrorMessage } from "../../ai";
+import { aiErrorKey } from "../../ai";
 import { addDays, dateKey, formatYuan, parseYuan, timeKey, type Config } from "../../data/model";
 import type { MonthStat } from "../../data/stats";
 import { splitSpeech, type VoiceItem } from "../../data/voice";
 import { useRuntime } from "../../runtime";
+import { messages, type MessageKey } from "../../i18n";
 import { yuan } from "../bits";
 import { useAliases } from "../queries";
 import { PartialAddError, addTxs } from "./actions";
@@ -22,10 +24,11 @@ export interface VoiceRequest {
   text: string;
 }
 
-type Phase = { state: "organizing" } | { state: "ready"; advice: string } | { state: "local"; reason: string };
+type Phase = { state: "organizing" } | { state: "ready"; advice: string } | { state: "local"; key: MessageKey };
 
 export function VoiceSheet({ request, config, stat, onClose }: { request: VoiceRequest | null; config: Config; stat: MonthStat; onClose(): void }) {
   const runtime = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const aliases = useAliases();
   const [items, setItems] = useState<VoiceItem[]>([]);
@@ -54,9 +57,9 @@ export function VoiceSheet({ request, config, stat, onClose }: { request: VoiceR
       })
       .catch(error => {
         if (controller.signal.aborted) return;
-        const message = aiErrorMessage(error);
-        if (message === null) return;
-        setPhase({ state: "local", reason: `${message}，已按句子拆开、用本地规则归类。` });
+        const key = aiErrorKey(error);
+        if (key === null) return;
+        setPhase({ state: "local", key });
       });
     return () => controller.abort();
     // 只在新的一段话进来时整理；分类、记忆变化不重新请求
@@ -91,15 +94,15 @@ export function VoiceSheet({ request, config, stat, onClose }: { request: VoiceR
           remember: item.source === "ai" || item.source === "picked",
         }))
       );
-      toast.success(`已记下 ${items.length} 笔 · ${yuan(total)}`);
+      toast.success(t("voice.savedToast", { count: items.length, amount: yuan(total) }));
       onClose();
     } catch (error) {
       if (error instanceof PartialAddError) {
         // 去掉已经记下的几笔，再点「全部记下」只记剩下的
         touched.current = true;
         setItems(list => list.slice(error.saved));
-        toast.error(error.message);
-      } else toast.error("记录失败");
+        toast.error(t("voice.partialAdd", { count: error.saved }));
+      } else toast.error(t("common.logFailed"));
     } finally {
       setSaving(false);
     }
@@ -114,7 +117,7 @@ export function VoiceSheet({ request, config, stat, onClose }: { request: VoiceR
         title={editingItem.note}
         trailing={
           <button type="button" onClick={() => setEditing(null)} className="ex:text-accent-text ex:h-8 ex:px-1 ex:text-[13.5px] ex:font-semibold">
-            完成
+            {t("common.done")}
           </button>
         }
       >
@@ -126,11 +129,11 @@ export function VoiceSheet({ request, config, stat, onClose }: { request: VoiceR
     <Sheet
       open={request != null}
       onClose={onClose}
-      title={organizing ? "正在整理" : `整理成 ${items.length} 笔`}
+      title={organizing ? t("voice.titleOrganizing") : t("voice.titleCount", { count: items.length })}
       trailing={organizing ? <Dots /> : null}
     >
       <p className="ex:text-ink-3 ex:mb-1.5 ex:text-[12px] ex:leading-[1.6]">
-        听到：<span className="ex:text-ink-2">{request?.text}</span>
+        {t("voice.heard")}<span className="ex:text-ink-2">{request?.text}</span>
       </p>
       <ul className="ex:divide-line-2 ex:divide-y">
         {items.map((item, index) => {
@@ -147,15 +150,19 @@ export function VoiceSheet({ request, config, stat, onClose }: { request: VoiceR
                   <span className="ex:block ex:truncate ex:text-[14px]">{item.note}</span>
                   <small className={cn("ex:block ex:truncate ex:text-[11px]", item.cents == null ? "ex:text-danger" : "ex:text-ink-3")}>
                     {item.cents == null
-                      ? "没听到金额"
-                      : [item.dayOffset === -1 ? "昨天" : item.dayOffset === -2 ? "前天" : "今天", cat?.name, item.source === "ai" ? "AI 归类，点一下可改" : null]
+                      ? t("voice.noAmount")
+                      : [
+                          item.dayOffset === -1 ? t("date.yesterday") : item.dayOffset === -2 ? t("date.dayBefore") : t("date.today"),
+                          cat?.name,
+                          item.source === "ai" ? t("voice.aiTag") : null,
+                        ]
                           .filter(Boolean)
                           .join(" · ")}
                   </small>
                 </span>
                 {item.cents == null ? (
                   <span className="ex:bg-accent-soft ex:text-accent-text ex:flex ex:h-7 ex:shrink-0 ex:items-center ex:rounded-full ex:px-[11px] ex:text-[12.5px] ex:font-[650]">
-                    填金额
+                    {t("voice.fillAmount")}
                   </span>
                 ) : (
                   <b className="ex:shrink-0 ex:text-[14px] ex:font-[650] ex:tabular-nums">{yuan(item.cents)}</b>
@@ -163,7 +170,7 @@ export function VoiceSheet({ request, config, stat, onClose }: { request: VoiceR
               </button>
               <button
                 type="button"
-                aria-label={`去掉 ${item.note}`}
+                aria-label={t("voice.removeAria", { name: item.note })}
                 onClick={() => drop(index)}
                 className="ex:text-ink-3 ex:grid ex:size-8 ex:shrink-0 ex:place-items-center"
               >
@@ -172,12 +179,12 @@ export function VoiceSheet({ request, config, stat, onClose }: { request: VoiceR
             </li>
           );
         })}
-        {!items.length && <li className="ex:text-ink-3 ex:py-5 ex:text-center ex:text-[12.5px]">没整理出可记的花费，重新说一次试试</li>}
+        {!items.length && <li className="ex:text-ink-3 ex:py-5 ex:text-center ex:text-[12.5px]">{t("voice.empty")}</li>}
       </ul>
       {phase.state === "local" ? (
         <div className="ex:bg-hover ex:text-ink-2 ex:my-3 ex:flex ex:gap-2 ex:rounded-[14px] ex:px-3 ex:py-2.5 ex:text-[12.5px] ex:leading-[1.7]">
           <Info className="ex:text-ink-3 ex:mt-[3px] ex:size-3.5 ex:shrink-0" />
-          <span>{phase.reason}</span>
+          <span>{t("voice.localReason", { message: t(phase.key) })}</span>
         </div>
       ) : (
         <div
@@ -187,11 +194,11 @@ export function VoiceSheet({ request, config, stat, onClose }: { request: VoiceR
           )}
         >
           <Sparkles className="ex:text-accent-text ex:mt-[3px] ex:size-3.5 ex:shrink-0" />
-          <span>{organizing ? "AI 正在归类…" : phase.advice || "已按你说的整理好。"}</span>
+          <span>{organizing ? t("voice.aiWorking") : phase.advice || t("voice.adviceFallback")}</span>
         </div>
       )}
       <PrimaryButton disabled={!items.length || missing > 0 || saving} onClick={() => void save()}>
-        {missing > 0 ? `${missing} 笔没有金额，先填上或去掉` : `${organizing ? "先记下" : "全部记下"} · ${yuan(total)}`}
+        {missing > 0 ? t("voice.savePartial", { count: missing }) : `${organizing ? t("voice.saveNow") : t("voice.saveAll")} · ${yuan(total)}`}
       </PrimaryButton>
     </Sheet>
   );

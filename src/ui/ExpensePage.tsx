@@ -5,12 +5,13 @@
  * 参数 add: true 时聚焦一句话输入（首页卡片与命令跳转用）。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PluginPageProps } from "@tau/plugins";
+import { useI18n, type PluginPageProps } from "@tau/plugins";
 import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { Button, FadeScroll, IconButton, Loading } from "@tau/ui";
 import { addDays, addMonths, monthOf } from "../data/model";
 import { samePeriodTotal, weekdayAverages } from "../data/stats";
 import { useRuntime } from "../runtime";
+import { messages } from "../i18n";
 import { AIPanel } from "./AIPanel";
 import { Card, CardHead, categoryColor, dayLabel, monthLabel, yuan } from "./bits";
 import { CategoryBudgets } from "./CategoryBudgets";
@@ -25,6 +26,7 @@ const EXAMPLES = ["奶茶 18", "打车回家 36", "淘宝买了个台灯 129", "
 
 export function ExpensePage({ params, pageContext }: PluginPageProps) {
   const { pages } = useRuntime();
+  const { t, locale } = useI18n(messages);
   const { today, time } = useNow();
   const current = monthOf(today);
   const [month, setMonth] = useState(current);
@@ -62,8 +64,8 @@ export function ExpensePage({ params, pageContext }: PluginPageProps) {
       chartMonths: d.history.slice(-CHART_MONTHS),
       weekday: weekdayAverages(d.txs, addDays(today, -90), addDays(today, -1)),
       lastSame: samePeriodTotal(d.txs, today),
-      todayTxs: d.txs.filter(t => t.date === today),
-      yesterday: d.txs.filter(t => t.date === addDays(today, -1) && t.recurringId == null).reduce((s, t) => s + t.cents, 0),
+      todayTxs: d.txs.filter(tx => tx.date === today),
+      yesterday: d.txs.filter(tx => tx.date === addDays(today, -1) && tx.recurringId == null).reduce((s, tx) => s + tx.cents, 0),
       earliest,
     };
   }, [query.data, today, current]);
@@ -85,7 +87,7 @@ export function ExpensePage({ params, pageContext }: PluginPageProps) {
     return () => void registration.dispose();
   }, [pageContext, query.data, month, day, category]);
 
-  if (query.isError) return <div className="ex:text-ink-3 ex:grid ex:h-full ex:place-items-center ex:text-[13px]">记录读取失败</div>;
+  if (query.isError) return <div className="ex:text-ink-3 ex:grid ex:h-full ex:place-items-center ex:text-[13px]">{t("common.loadFailed")}</div>;
   if (!query.data || !derived || !settled) return <Loading />;
   const { stat, config, txs } = query.data;
   const { nowStat } = derived;
@@ -103,7 +105,7 @@ export function ExpensePage({ params, pageContext }: PluginPageProps) {
     <div className="ex:mx-auto ex:flex ex:h-full ex:min-h-0 ex:w-full ex:max-w-[1720px] ex:flex-col ex:px-4 ex:pb-4 ex:pt-1">
       <div className="ex:bg-surface ex:shadow-card ex:rounded-tau-lg ex:flex ex:min-h-0 ex:flex-1 ex:flex-col ex:overflow-hidden">
         <header className="ex:flex-none ex:px-8 ex:pt-5">
-          <h1 className="ex:text-tau-title-lg ex:flex ex:h-10 ex:items-center ex:font-semibold ex:tracking-[-0.01em]">记账</h1>
+          <h1 className="ex:text-tau-title-lg ex:flex ex:h-10 ex:items-center ex:font-semibold ex:tracking-[-0.01em]">{t("app.page.title")}</h1>
         </header>
         <FadeScroll className="ex:mb-4 ex:min-h-0 ex:flex-1 ex:pb-4 ex:pl-8 ex:pr-[26px] ex:pt-3">
           <div className="ex:@container">
@@ -113,22 +115,22 @@ export function ExpensePage({ params, pageContext }: PluginPageProps) {
 
                 <Card>
                   <header className="ex:flex ex:flex-wrap ex:items-center ex:gap-1.5 ex:px-[18px] ex:pt-3.5">
-                    <IconButton aria-label="上个月" disabled={month <= derived.earliest} onClick={() => goMonth(addMonths(month, -1))}>
+                    <IconButton aria-label={t("common.prevMonth")} disabled={month <= derived.earliest} onClick={() => goMonth(addMonths(month, -1))}>
                       <ChevronLeft className="ex:size-4" strokeWidth={1.75} />
                     </IconButton>
                     <h2 className="ex:mx-1 ex:text-[14.5px] ex:font-semibold ex:tabular-nums">
-                      {month.slice(0, 4)} 年 {monthLabel(month)}
+                      {t("date.yearMonth", { year: month.slice(0, 4), month: monthLabel(month, locale) })}
                     </h2>
-                    <IconButton aria-label="下个月" disabled={isNow} onClick={() => goMonth(addMonths(month, 1))}>
+                    <IconButton aria-label={t("common.nextMonth")} disabled={isNow} onClick={() => goMonth(addMonths(month, 1))}>
                       <ChevronRight className="ex:size-4" strokeWidth={1.75} />
                     </IconButton>
                     {!isNow && (
                       <Button size="sm" variant="ghost" onClick={() => goMonth(current)}>
-                        回到本月
+                        {t("expense.backToCurrent")}
                       </Button>
                     )}
                     <span className="ex:text-ink-3 ex:ml-1.5 ex:text-[11.5px]">
-                      {filterCat ? `只看${filterCat.name}` : `可控 ${yuan(stat.flex)} · 固定 ${yuan(stat.fixed)}`}
+                      {filterCat ? t("common.onlyCat", { name: filterCat.name }) : t("common.flexFixed", { flex: yuan(stat.flex), fixed: yuan(stat.fixed) })}
                     </span>
                   </header>
                   <MonthCalendar
@@ -143,9 +145,12 @@ export function ExpensePage({ params, pageContext }: PluginPageProps) {
                 </Card>
 
                 <Card>
-                  <CardHead title={`${monthLabel(month)}分类预算`} note={`${isNow ? "竖线 = 时间进度 · " : ""}点一类，日历和流水只看它`}>
+                  <CardHead
+                    title={t("expense.catBudgetsTitle", { month: monthLabel(month, locale) })}
+                    note={`${isNow ? `${t("summary.paceLegend")} · ` : ""}${t("budgets.pickNote")}`}
+                  >
                     <Button size="sm" variant="ghost" icon={SlidersHorizontal} onClick={openSettings}>
-                      调整预算
+                      {t("budgets.adjust")}
                     </Button>
                   </CardHead>
                   <CategoryBudgets stat={stat} categories={config.categories} selected={category} onPick={id => setCategory(category === id ? null : id)} />
@@ -165,9 +170,9 @@ export function ExpensePage({ params, pageContext }: PluginPageProps) {
               <div className="ex:flex ex:min-w-0 ex:flex-col ex:gap-3.5">
                 <Card className="ex:px-4 ex:pt-3.5 ex:pb-3">
                   <div className="ex:text-ink-3 ex:mb-2.5 ex:flex ex:items-center ex:text-[12px]">
-                    一句话记账
+                    {t("quick.oneLine")}
                     <span className="ex:flex-1" />
-                    {dayLabel(today)} {time}
+                    {dayLabel(t, today)} {time}
                   </div>
                   <div ref={addRef}>
                     <QuickAdd today={today} config={config} stat={nowStat} examples={EXAMPLES} />
@@ -195,6 +200,7 @@ export function ExpensePage({ params, pageContext }: PluginPageProps) {
 }
 
 function CalendarLegend({ filterName, allowance }: { filterName: string | null; allowance: number }) {
+  const { t } = useI18n(messages);
   const item = "ex:inline-flex ex:items-center ex:gap-1.5";
   return (
     <div className="ex:text-ink-3 ex:flex ex:flex-wrap ex:gap-x-3.5 ex:gap-y-1 ex:px-[18px] ex:pt-2 ex:pb-3.5 ex:text-[11px]">
@@ -203,18 +209,19 @@ function CalendarLegend({ filterName, allowance }: { filterName: string | null; 
           <i className="ex:block ex:h-full ex:w-3 ex:rounded-l-[3px]" style={{ background: categoryColor(0) }} />
           <i className="ex:block ex:h-full ex:flex-1 ex:rounded-r-[3px]" style={{ background: categoryColor(1) }} />
         </i>
-        条 = 当天支出的分类构成
+        {t("expense.barLegend")}
       </span>
       {allowance > 0 && (
         <span>
-          满半格 = 日均额度 {yuan(allowance)}
-          {filterName ? `（${filterName}）` : ""}，超过显示红字
+          {t("expense.allowanceLegend", { amount: yuan(allowance) })}
+          {filterName ? t("expense.allowanceFilter", { name: filterName }) : ""}
+          {t("expense.allowanceOver")}
         </span>
       )}
       {!filterName && (
         <span className={item}>
           <i className="ex:bg-ink-3 ex:size-[5px] ex:rounded-full" />
-          有固定支出（不计入）
+          {t("expense.hasFixed")}
         </span>
       )}
     </div>

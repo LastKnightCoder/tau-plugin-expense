@@ -3,10 +3,11 @@
  * 每个 view 单独注册为插件页面，由宿主页面栈承载返回。
  */
 import { useMemo, useState } from "react";
-import type { PluginPageProps } from "@tau/plugins";
+import { useI18n, type PluginPageProps } from "@tau/plugins";
 import { Loading } from "@tau/ui";
 import { addDays, monthOf } from "../../data/model";
 import { weekdayAverages } from "../../data/stats";
+import { messages } from "../../i18n";
 import { CHART_MONTHS, useLedger, useNow } from "../queries";
 import { CalendarView } from "./CalendarView";
 import { CategoriesView, CategoryDetail } from "./CategoryViews";
@@ -17,6 +18,7 @@ import { SheetHost } from "./Sheet";
 export type MobileView = "calendar" | "categories" | "category" | "review" | "search";
 
 export function MobileViews({ view, params, pageContext }: PluginPageProps & { view: MobileView }) {
+  const { t } = useI18n(messages);
   const { today, time } = useNow();
   const current = monthOf(today);
   const [month, setMonth] = useState(current);
@@ -33,7 +35,7 @@ export function MobileViews({ view, params, pageContext }: PluginPageProps & { v
     };
   }, [query.data, today, current]);
 
-  if (query.isError) return <div className="ex:text-ink-3 ex:grid ex:h-60 ex:place-items-center ex:text-[13px]">记录读取失败</div>;
+  if (query.isError) return <div className="ex:text-ink-3 ex:grid ex:h-60 ex:place-items-center ex:text-[13px]">{t("common.loadFailed")}</div>;
   // 翻月时 placeholderData 还是上个月的，这期间不渲染
   if (!query.data || !derived || (view === "calendar" && query.data.stat.month !== month)) return <Loading minHeight={240} />;
   const { stat, config, txs, history } = query.data;

@@ -3,13 +3,16 @@
  */
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useI18n } from "@tau/plugins";
 import { Button, DatePicker, Dialog, DialogBody, FormField, Input, Select, toast } from "@tau/ui";
 import { formatYuan, parseYuan, type Category, type Tx } from "../data/model";
 import { EXPENSE_KEY, useRuntime } from "../runtime";
+import { messages } from "../i18n";
 import { CategoryIcon } from "./bits";
 
 export function TxDialog({ tx, categories, onClose }: { tx: Tx | null; categories: readonly Category[]; onClose(): void }) {
   const { data, context } = useRuntime();
+  const { t } = useI18n(messages);
   const client = useQueryClient();
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
@@ -36,7 +39,7 @@ export function TxDialog({ tx, categories, onClose }: { tx: Tx | null; categorie
       await client.invalidateQueries({ queryKey: EXPENSE_KEY });
       onClose();
     } catch {
-      toast.error("保存失败，可能在别处被改过，刷新后再试");
+      toast.error(t("txDialog.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -46,22 +49,22 @@ export function TxDialog({ tx, categories, onClose }: { tx: Tx | null; categorie
     <Dialog
       open={tx != null}
       onOpenChange={open => !open && onClose()}
-      title="修改这笔支出"
+      title={t("txDialog.title")}
       size="sm"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            取消
+            {t("common.cancel")}
           </Button>
           <Button disabled={!valid} loading={saving} onClick={() => void save()}>
-            保存
+            {t("common.save")}
           </Button>
         </>
       }
     >
       <DialogBody>
         <div className="ex:flex ex:flex-col ex:gap-3">
-          <FormField label="金额">
+          <FormField label={t("txDialog.amount")}>
             {field => (
               <Input
                 {...field}
@@ -75,11 +78,11 @@ export function TxDialog({ tx, categories, onClose }: { tx: Tx | null; categorie
               />
             )}
           </FormField>
-          <FormField label="分类">
+          <FormField label={t("common.category")}>
             {field => (
               <Select
                 {...field}
-                aria-label="分类"
+                aria-label={t("common.category")}
                 value={category}
                 onValueChange={setCategory}
                 options={categories.map(c => ({
@@ -95,10 +98,10 @@ export function TxDialog({ tx, categories, onClose }: { tx: Tx | null; categorie
               />
             )}
           </FormField>
-          <FormField label="备注">
+          <FormField label={t("txDialog.note")}>
             {field => <Input {...field} value={note} onChange={e => setNote(e.target.value)} maxLength={200} />}
           </FormField>
-          <FormField label="日期">
+          <FormField label={t("txDialog.date")}>
             {field => <DatePicker {...field} value={date} onValueChange={v => v && setDate(v)} />}
           </FormField>
         </div>
