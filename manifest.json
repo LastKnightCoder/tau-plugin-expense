@@ -18,16 +18,16 @@
     }
   },
   "permissions": ["ai:chat", "speech:input"],
-  "version": "0.2.8",
+  "version": "0.2.9",
   "targets": {
     "desktop": {
       "minAppVersion": "0.68.0"
     },
     "android": {
-      "minAppVersion": "0.6.0"
+      "minAppVersion": "0.7.0"
     },
     "ios": {
-      "minAppVersion": "0.6.0"
+      "minAppVersion": "0.7.0"
     }
   }
 }
