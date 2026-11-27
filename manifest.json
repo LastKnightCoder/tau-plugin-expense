@@ -4,17 +4,30 @@
   "description": "一句话记下每笔花费，按分类预算看本月还能花多少，用日历和图表看清钱花在哪。手机上可以按住说话一次记好几笔。",
   "categories": ["page"],
   "keywords": ["记账", "花费", "支出", "预算", "账本", "消费"],
+  "locales": ["zh-CN", "zh-TW", "en-US"],
+  "i18n": {
+    "zh-TW": {
+      "name": "記帳本",
+      "description": "一句話記下每筆花費，按分類預算看本月還能花多少，用月曆和圖表看清錢花在哪。手機上可以按住說話一次記好幾筆。",
+      "keywords": ["記帳", "花費", "支出", "預算", "帳本", "消費"]
+    },
+    "en-US": {
+      "name": "Expense Tracker",
+      "description": "Log expenses in one line, track how much budget is left by category, and see where your money goes with calendars and charts. On mobile, hold to speak and log multiple items at once.",
+      "keywords": ["expenses", "spending", "budget", "ledger", "finance", "tracker"]
+    }
+  },
   "permissions": ["ai:chat", "speech:input"],
-  "version": "0.2.7",
+  "version": "0.2.8",
   "targets": {
     "desktop": {
-      "minAppVersion": "0.60.7"
+      "minAppVersion": "0.68.0"
     },
     "android": {
-      "minAppVersion": "0.2.16"
+      "minAppVersion": "0.6.0"
     },
     "ios": {
-      "minAppVersion": "0.2.16"
+      "minAppVersion": "0.6.0"
     }
   }
 }
